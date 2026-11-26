@@ -1,7 +1,6 @@
 import json
 import subprocess
 import sys
-import time
 
 import pytest
 
@@ -117,8 +116,9 @@ def test_resolve_model_agrees_with_resolve(env):
     assert res.resolve_model("pyannote").path == paths.pyannote_dir
 
 
-def test_cli_dispatch_is_fast_and_light():
-    t0 = time.time()
+def test_cli_dispatch_is_light():
+    # "Fast" is checked through what gets imported, not wall-clock time: starting Python takes
+    # over a second on a busy machine, which made a timing limit flaky on CI.
     r = subprocess.run([sys.executable, "-c",
                         "import sys; from liteecho.cli import main; main(['engine-info','--json']);"
                         "import json; heavy=[m for m in ('torch','huggingface_hub','av') if m in sys.modules];"
@@ -127,7 +127,6 @@ def test_cli_dispatch_is_fast_and_light():
     assert r.returncode == 0
     check_schema(json.loads(r.stdout))
     assert r.stderr == "[]"
-    assert time.time() - t0 < 1.0
 
 
 def _fake_expected(monkeypatch):
