@@ -26,6 +26,8 @@ public struct AppPaths: Sendable, Equatable {
     public var uvPythonDir: URL { supportDir.appendingPathComponent("python", isDirectory: true) }
     public var uvCacheDir: URL { supportDir.appendingPathComponent("uv-cache", isDirectory: true) }
     public var queueFile: URL { supportDir.appendingPathComponent("queue.json") }
+    /// Ids of Voice Memos that were imported successfully.
+    public var importedVoiceMemosFile: URL { supportDir.appendingPathComponent("imported-voice-memos.json") }
     public var logsDir: URL { supportDir.appendingPathComponent("logs", isDirectory: true) }
 
     // Files shipped inside the app bundle by scripts/build-app.sh.

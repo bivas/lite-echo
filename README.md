@@ -10,6 +10,7 @@ pyannote community-1 for speakers, and runs entirely on your Mac.
 - A `liteecho` command-line tool, using the same engine and the same models
 - 100 languages with auto-detect, and tuned prompts for 66 of them
 - Speaker presets (Solo, Conversation, Meeting) or an exact count or range
+- Import straight from Apple's Voice Memos, with titles, dates and folders, and optional auto-import
 - Five themes; transcripts open in your default browser
 
 ## Screenshots
@@ -60,9 +61,18 @@ the wheel bundled in the app. Then, for each model, you choose:
 - **Results:** transcripts are saved as HTML next to the audio, or in a folder you choose, and open in
   your default browser. To rename speakers, use *Rename Speakers…* in the context menu of a finished
   row.
+- **Voice Memos:** *Import from Voice Memos…* (by the drop zone, in File (⇧⌘I) or in the menu bar)
+  lists your memos with title, date, length and folder.
+  - Pick the ones to transcribe. Memos you've already imported are skipped.
+  - LiteEcho needs **Full Disk Access** for this (System Settings › Privacy & Security). It only reads
+    Voice Memos and never changes it.
+  - Transcripts go to `~/Documents/LiteEcho Transcripts`; you can change that in Preferences › Voice Memos.
+  - The same tab can add new memos to the queue automatically.
+  - Without the permission, you can still drag memos onto LiteEcho, but you get the audio only.
 - **Preferences** (gear button at the top right, or ⌘,):
   - Appearance: five themes (Professional, Cyberpunk, Lite Lime, Echo Mint, Paper Studio)
   - Model locations
+  - Voice Memos: access, where transcripts are saved, automatic import
   - The Hugging Face token, kept in the Keychain
   - The command-line tool, with a check of whether `liteecho` is on your PATH
 
@@ -112,6 +122,8 @@ download again.
 ```
 liteecho engine-info --json [--verify] [--whisper-dir DIR] [--pyannote-dir DIR]
 liteecho rename-speakers FILE.html --map S1=Dana --map S2=Avi [--events jsonl]
+liteecho voice-memos list [--json]
+liteecho voice-memos import ID [--output-folder DIR] [transcribe options]
 ```
 
 - **`engine-info`** prints:
@@ -121,6 +133,8 @@ liteecho rename-speakers FILE.html --map S1=Dana --map S2=Avi [--events jsonl]
   - the supported languages
 - **`rename-speakers`** sets the display name for a speaker ID. Names are trimmed and sanitised, then
   escaped, and the file is replaced atomically.
+- **`voice-memos`** lists and imports recordings from Apple's Voice Memos. It reads a private copy of the
+  library and never writes to it. Your terminal app needs Full Disk Access for this.
 - **Stopping:** SIGTERM stops a running job like Ctrl-C: workers end, temp files are removed, and the
   exit code is 143.
 

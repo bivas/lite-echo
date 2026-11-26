@@ -18,6 +18,9 @@ public struct SettingsView: View {
             ModelsSettingsTab()
                 .tabItem { Label("Models", systemImage: "cube") }
                 .tag(SettingsTab.models)
+            VoiceMemosSettingsTab()
+                .tabItem { Label("Voice Memos", systemImage: "mic") }
+                .tag(SettingsTab.voiceMemos)
             AdvancedSettingsTab()
                 .tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
                 .tag(SettingsTab.advanced)

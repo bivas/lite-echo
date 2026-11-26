@@ -89,7 +89,7 @@ public struct MenuBarContent: View {
     }
 
     private var stateLine: String {
-        if let job = store.runningJob { return "Transcribing “\(job.audio.lastPathComponent)”" }
+        if let job = store.runningJob { return "Transcribing “\(job.displayName)”" }
         if store.isPaused { return "Paused" }
         let waiting = store.jobs.filter { $0.state == .waiting }.count
         return waiting > 0 ? "\(waiting) waiting" : "Idle"
@@ -115,11 +115,11 @@ public struct MenuBarContent: View {
     @ViewBuilder private func runningSection(_ job: Job) -> some View {
         if case .running(let stage, _, let detail) = job.state {
             VStack(alignment: .leading, spacing: 6) {
-                Text(job.audio.lastPathComponent).font(.subheadline.weight(.semibold))
+                Text(job.displayName).font(.subheadline.weight(.semibold))
                     .lineLimit(1).truncationMode(.middle)
                 Text(QueueFormat.stageName(stage)).font(.caption).foregroundStyle(theme.secondaryText)
                 ThemedProgressBar(value: QueueFormat.overallProgress(of: job.state) ?? 0)
-                    .accessibilityLabel("Progress for \(job.audio.lastPathComponent)")
+                    .accessibilityLabel("Progress for \(job.displayName)")
                 if let detail { Text(detail).font(.caption).foregroundStyle(theme.secondaryText) }
                 Text(QueueFormat.knownInfoParts(for: job, languages: store.model.languages).joined(separator: " · "))
                     .font(.caption).foregroundStyle(theme.secondaryText)
@@ -153,7 +153,7 @@ public struct MenuBarContent: View {
                 TranscriptOpener.open(output)
             } label: {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(job.audio.lastPathComponent).font(.subheadline).lineLimit(1).truncationMode(.middle)
+                    Text(job.displayName).font(.subheadline).lineLimit(1).truncationMode(.middle)
                     Text(QueueFormat.menuSubtitle(for: job, ago: ago(job), languages: store.model.languages)).font(.caption)
                         .foregroundStyle(theme.secondaryText).lineLimit(1)
                 }
@@ -165,13 +165,13 @@ public struct MenuBarContent: View {
         case .failed(let message):
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(job.audio.lastPathComponent).font(.subheadline).lineLimit(1).truncationMode(.middle)
+                    Text(job.displayName).font(.subheadline).lineLimit(1).truncationMode(.middle)
                     Text(message).font(.caption).foregroundStyle(theme.danger).lineLimit(3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Button("Retry") { store.retry(job.id) }
                     .buttonStyle(.themedSecondary).controlSize(.small)
-                    .accessibilityLabel("Retry \(job.audio.lastPathComponent)")
+                    .accessibilityLabel("Retry \(job.displayName)")
             }
         default:
             EmptyView()
@@ -185,6 +185,11 @@ public struct MenuBarContent: View {
                 NSApp.activate(ignoringOtherApps: true)
             }
             Button("Add Files…") { addFiles() }
+            Button("From Voice Memos…") {
+                store.model.showVoiceMemoImport = true
+                openWindow(id: WindowID.main)
+                NSApp.activate(ignoringOtherApps: true)
+            }
             Button(store.isPaused ? "Resume queue" : "Pause queue") { store.isPaused.toggle() }
             Button("Quit LiteEcho") { NSApp.terminate(nil) }
         }

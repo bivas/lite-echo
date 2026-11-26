@@ -191,9 +191,13 @@ public struct Job: Codable, Identifiable, Equatable, Sendable {
     public var detectedLanguage: String?
     /// Number of speakers the engine found (auto mode) or was given. nil until diarization ends.
     public var detectedSpeakers: Int?
+    /// Set when the job transcribes a Voice Memo (then `audio` is only a placeholder and the
+    /// engine reads the recording itself). Optional, so queues saved before it existed still load.
+    public var voiceMemo: VoiceMemoRef?
 
     public init(id: UUID = UUID(), audio: URL, options: JobOptions, state: JobState = .waiting,
-                addedAt: Date = Date(), detectedLanguage: String? = nil, detectedSpeakers: Int? = nil) {
+                addedAt: Date = Date(), detectedLanguage: String? = nil, detectedSpeakers: Int? = nil,
+                voiceMemo: VoiceMemoRef? = nil) {
         self.id = id
         self.audio = audio
         self.options = options
@@ -201,10 +205,23 @@ public struct Job: Codable, Identifiable, Equatable, Sendable {
         self.addedAt = addedAt
         self.detectedLanguage = detectedLanguage
         self.detectedSpeakers = detectedSpeakers
+        self.voiceMemo = voiceMemo
     }
+
+    /// A job for one Voice Memo. The placeholder audio path is never opened.
+    public static func voiceMemo(_ ref: VoiceMemoRef, options: JobOptions, addedAt: Date = Date()) -> Job {
+        Job(audio: URL(fileURLWithPath: "/Voice Memos/\(ref.id)"), options: options, addedAt: addedAt, voiceMemo: ref)
+    }
+
+    /// What a row calls this job: the memo's title, or the audio file name.
+    public var displayName: String { voiceMemo?.title ?? audio.lastPathComponent }
 
     /// Where the engine will write the transcript.
     public var expectedOutput: URL {
+        if let memo = voiceMemo {
+            let folder = options.outputFolder ?? EngineCommand.defaultVoiceMemoFolder
+            return folder.appendingPathComponent(memo.title).appendingPathExtension("html")
+        }
         let folder = options.outputFolder ?? audio.deletingLastPathComponent()
         return folder.appendingPathComponent(audio.deletingPathExtension().lastPathComponent)
             .appendingPathExtension("html")
@@ -216,6 +233,7 @@ public enum EngineCommand {
     /// `whisperDir` / `pyannoteDir`: the model's own folder when the user keeps it outside
     /// LiteEcho's folder; the flags are added only when set.
     public static func transcribe(_ job: Job, whisperDir: URL? = nil, pyannoteDir: URL? = nil) -> [String] {
+        if job.voiceMemo != nil { return voiceMemoImport(job, whisperDir: whisperDir, pyannoteDir: pyannoteDir) }
         var args = [job.audio.path,
                     "--language", job.options.language.code]
         args += job.options.speakers.cliArguments
@@ -223,6 +241,25 @@ public enum EngineCommand {
         if let folder = job.options.outputFolder {
             args += ["--output-folder", folder.path]
         }
+        return args + modelDirArguments(whisperDir: whisperDir, pyannoteDir: pyannoteDir)
+    }
+
+    /// `~/Documents/LiteEcho Transcripts`, where imported memos go unless told otherwise.
+    public static var defaultVoiceMemoFolder: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("LiteEcho Transcripts", isDirectory: true)
+    }
+
+    /// `voice-memos list --json`.
+    public static func voiceMemoList() -> [String] { ["voice-memos", "list", "--json"] }
+
+    /// `voice-memos import ID …` for a memo job (the engine reads the library itself).
+    public static func voiceMemoImport(_ job: Job, whisperDir: URL? = nil, pyannoteDir: URL? = nil) -> [String] {
+        var args = ["voice-memos", "import", job.voiceMemo?.id ?? "",
+                    "--language", job.options.language.code]
+        if let folder = job.options.outputFolder { args += ["--output-folder", folder.path] }
+        args += job.options.speakers.cliArguments
+        args += ["--events", "jsonl"]
         return args + modelDirArguments(whisperDir: whisperDir, pyannoteDir: pyannoteDir)
     }
 

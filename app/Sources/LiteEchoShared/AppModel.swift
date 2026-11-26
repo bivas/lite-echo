@@ -21,6 +21,12 @@ public final class AppModel {
     /// The Settings tab to show; set it before opening the Settings window to pick one.
     public var settingsTab: SettingsTab = .general
 
+    /// Asks the main window to show the Voice Memos import sheet (File menu, menu bar, Preferences).
+    public var showVoiceMemoImport = false
+
+    /// Replaces the engine call that lists Voice Memos (tests and previews).
+    @ObservationIgnored public var voiceMemoLister: (@MainActor () async -> VoiceMemoListing)?
+
     /// Snapshot/preview hook only: when set, `refreshEngineInfo` and folder validation never run
     /// the engine and `engineInfo` stays as given to `useFixedEngineInfoForSnapshots`.
     public private(set) var engineInfoIsFixedForSnapshots = false
@@ -111,6 +117,22 @@ public final class AppModel {
         await refreshEngineInfo()
     }
 
+    /// Runs `liteecho voice-memos list --json`. Never throws: any problem becomes an `unreadable` listing.
+    public func listVoiceMemos() async -> VoiceMemoListing {
+        if let voiceMemoLister { return await voiceMemoLister() }
+        guard isEngineInstalled else { return .unreadable("The engine is not installed yet.") }
+        do {
+            let output = try await Self.capture(executable: paths.engineBinary,
+                                                arguments: EngineCommand.voiceMemoList(),
+                                                environment: engineEnvironment)
+            return try VoiceMemoListing.decode(output)
+        } catch let CaptureError.exit(code) {
+            return .unreadable("The engine stopped with exit code \(code) while listing Voice Memos.")
+        } catch {
+            return .unreadable("The engine's answer could not be read: \(error.localizedDescription)")
+        }
+    }
+
     /// Runs a short command and returns its stdout.
     public nonisolated static func capture(executable: URL, arguments: [String],
                                     environment: [String: String]) async throws -> Data {
@@ -126,8 +148,17 @@ public final class AppModel {
             let out = Pipe()
             process.standardOutput = out
             process.standardError = FileHandle.nullDevice
+            // Read while the process runs: a long answer (a big Voice Memos list) would otherwise
+            // fill the pipe and block the engine forever.
+            let collected = CaptureBuffer()
+            out.fileHandleForReading.readabilityHandler = { handle in
+                let chunk = handle.availableData
+                if !chunk.isEmpty { collected.append(chunk) }
+            }
             process.terminationHandler = { proc in
-                let data = out.fileHandleForReading.readDataToEndOfFile()
+                out.fileHandleForReading.readabilityHandler = nil
+                collected.append(out.fileHandleForReading.readDataToEndOfFile())
+                let data = collected.data
                 if proc.terminationStatus == 0 {
                     continuation.resume(returning: data)
                 } else {
@@ -139,11 +170,18 @@ public final class AppModel {
     }
 
     public enum CaptureError: Error { case exit(Int32) }
+
+    private final class CaptureBuffer: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storage = Data()
+        func append(_ chunk: Data) { lock.lock(); storage.append(chunk); lock.unlock() }
+        var data: Data { lock.lock(); defer { lock.unlock() }; return storage }
+    }
 }
 
 /// Tabs of the Settings window.
 public enum SettingsTab: String, Hashable, Sendable {
-    case general, models, advanced
+    case general, models, voiceMemos, advanced
 }
 
 /// Result of checking a folder a user picked for one model.

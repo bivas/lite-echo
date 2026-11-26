@@ -41,7 +41,12 @@ public final class QueueStore {
         var baseline = 0.0
     }
 
+    /// Ids of Voice Memos that were imported successfully (persisted).
+    public private(set) var importedMemoIDs: Set<String> = []
+
     @ObservationIgnored private var currentJobID: UUID?
+    @ObservationIgnored private var autoImporter: VoiceMemoAutoImporter?
+    @ObservationIgnored private var activationObserver: NSObjectProtocol?
     @ObservationIgnored private var currentProcess: EngineProcess?
     @ObservationIgnored private var cancelRequested = false
     @ObservationIgnored private var runState = RunState()
@@ -51,6 +56,7 @@ public final class QueueStore {
         self.model = model
         self.storeURL = storeURL ?? model.paths.queueFile
         restore()
+        importedMemoIDs = ImportedVoiceMemoStore(paths: model.paths).load()
         updateSystemState()
     }
 
@@ -75,6 +81,59 @@ public final class QueueStore {
         guard added else { return }
         persist()
         pump()
+    }
+
+    /// Ids of memos with a waiting or running job.
+    public var queuedMemoIDs: Set<String> {
+        Set(jobs.compactMap { $0.state.isFinished ? nil : $0.voiceMemo?.id })
+    }
+
+    /// Ids of memos with a job in any state (also failed or cancelled ones).
+    public var everQueuedMemoIDs: Set<String> { Set(jobs.compactMap { $0.voiceMemo?.id }) }
+
+    /// Adds one job per memo (already imported, only-in-iCloud and already waiting ones are skipped).
+    /// - Returns: how many jobs were added.
+    @discardableResult
+    public func addVoiceMemos(_ memos: [VoiceMemo], folderNames: [String: String] = [:],
+                              options: JobOptions? = nil) -> Int {
+        let options = options ?? model.settings.newVoiceMemoOptions
+        var taken = queuedMemoIDs
+        var added = 0
+        for memo in memos where memo.local && !importedMemoIDs.contains(memo.id) && !taken.contains(memo.id) {
+            taken.insert(memo.id)
+            let ref = VoiceMemoRef(memo, folder: memo.folderID.flatMap { folderNames[$0] })
+            let job = Job.voiceMemo(ref, options: options)
+            jobs.append(job)
+            loadDuration(for: job)
+            added += 1
+        }
+        guard added > 0 else { return 0 }
+        persist()
+        pump()
+        return added
+    }
+
+    /// Starts checking Voice Memos for new recordings every two minutes and when the app becomes
+    /// active, if the user turned auto-import on. Safe to call more than once.
+    public func startVoiceMemoAutoImport() {
+        guard autoImporter == nil else { return }
+        let importer = VoiceMemoAutoImporter(hooks: .init(
+            lister: { [model] in await model.listVoiceMemos() },
+            policy: { [model] in model.settings.autoImportPolicy },
+            importedIDs: { [weak self] in self?.importedMemoIDs ?? [] },
+            queuedIDs: { [weak self] in self?.everQueuedMemoIDs ?? [] },
+            canRun: { [model] in model.isEngineInstalled && !model.needsSetup },
+            enqueue: { [weak self] memos, listing in
+                guard let self else { return }
+                self.addVoiceMemos(memos, folderNames: listing.folderNames)
+            }))
+        autoImporter = importer
+        importer.start()
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak importer] _ in
+            Task { @MainActor in importer?.appBecameActive() }
+        }
+        importer.appBecameActive()
     }
 
     /// Removes a job; a running one is cancelled first.
@@ -258,8 +317,9 @@ public final class QueueStore {
             persist()
         case .done(let output, let sampled):
             runState.done = (output, sampled)
-        case .error(let message, _):
-            runState.errorMessage = message
+        case .error(let message, let detail):
+            let isMemo = jobs.first { $0.id == jobID }?.voiceMemo != nil
+            runState.errorMessage = isMemo ? VoiceMemoImportError.message(forCode: detail, fallback: message) : message
         case .unknown:
             break
         }
@@ -283,6 +343,9 @@ public final class QueueStore {
         } else if let result, result.exitCode == 0, let done = state.done {
             let output = done.output.map { URL(fileURLWithPath: $0) } ?? current.expectedOutput
             newState = .done(output: output, sampled: done.sampled)
+            if let memo = current.voiceMemo {
+                importedMemoIDs = ImportedVoiceMemoStore(paths: model.paths).insert(memo.id)
+            }
             let language = current.detectedLanguage
                 ?? (current.options.language.isAuto ? nil : current.options.language.code)
             try? TranscriptMetadataStore(paths: model.paths).save(
@@ -363,6 +426,10 @@ public final class QueueStore {
     // MARK: Durations
 
     private func loadDuration(for job: Job) {
+        if let memo = job.voiceMemo {
+            if let seconds = memo.duration { durations[job.id] = seconds }
+            return
+        }
         let id = job.id, url = job.audio
         Task { [weak self] in
             let seconds = await Self.audioDuration(of: url)
@@ -401,7 +468,7 @@ public final class QueueStore {
 
     private func postNotification(for job: Job, success: Bool, state: JobState) {
         guard Bundle.main.bundleIdentifier != nil else { return }
-        let name = job.audio.deletingPathExtension().lastPathComponent
+        let name = job.voiceMemo?.title ?? job.audio.deletingPathExtension().lastPathComponent
         var body = name
         if let seconds = durations[job.id] { body += " · \(QueueFormat.duration(seconds))" }
         // e.g. "Hebrew (detected) · 2 speakers (detected)", as in the menu bar mockup.

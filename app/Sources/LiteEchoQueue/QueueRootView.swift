@@ -55,6 +55,9 @@ public struct QueueRootView: View {
         .onChange(of: store.model.modelsReady) { _, ready in
             if ready { store.modelsMayBeReady() }
         }
+        .sheet(isPresented: Bindable(store.model).showVoiceMemoImport) {
+            VoiceMemoFlowSheet(store: store).themed(store.model.settings)
+        }
     }
 
     /// Opens Settings on Models when a model is missing, else on General.
@@ -73,6 +76,8 @@ public struct QueueRootView: View {
                 Text("Drop audio or video files here, or click to choose").themedHeading(15)
                 Text("m4a, mp3, wav, mp4, mov and anything else FFmpeg reads. Files are processed on this Mac only.")
                     .font(.callout).foregroundStyle(theme.secondaryText).multilineTextAlignment(.center)
+                // Room for the Voice Memos button laid over the bottom of the zone.
+                Color.clear.frame(height: 30)
             }
             .frame(maxWidth: .infinity, minHeight: 150)
             .padding(20)
@@ -85,6 +90,17 @@ public struct QueueRootView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Add audio files")
+        .accessibilityHint("Opens a file picker; you can also drop files here")
+        // A sibling above the zone's button, so clicking it never opens the file picker.
+        .overlay(alignment: .bottom) {
+            Button { store.model.showVoiceMemoImport = true } label: {
+                Label("Import from Voice Memos…", systemImage: "mic")
+            }
+            .buttonStyle(.themedSecondary)
+            .padding(.bottom, 18)
+            .help("Pick recordings from the Voice Memos app")
+        }
         .onHover { inside in
             if inside, !isHovering { NSCursor.pointingHand.push(); isHovering = true }
             else if !inside, isHovering { NSCursor.pop(); isHovering = false }
@@ -93,8 +109,6 @@ public struct QueueRootView: View {
         .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
         }
-        .accessibilityLabel("Add audio files")
-        .accessibilityHint("Opens a file picker; you can also drop files here")
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {

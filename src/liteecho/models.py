@@ -46,3 +46,5 @@ class RenderOptions:
     created: str | None = None     # ISO-8601 UTC; None = now
     transcript_start_ms: int = 0   # offset of the first decoded frame; added to every time shown
     app_version: str = field(default_factory=lambda: __version__)
+    # Additional (name, content) meta tags after the standard ones, e.g. liteecho:source.
+    extra_meta: list[tuple[str, str]] = field(default_factory=list)

@@ -23,8 +23,11 @@ struct QueueRow: View {
             HStack(spacing: 14) {
                 icon.frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(job.audio.lastPathComponent).font(.system(size: 14, weight: .semibold))
-                        .lineLimit(1).truncationMode(.middle)
+                    HStack(spacing: 8) {
+                        Text(job.displayName).font(.system(size: 14, weight: .semibold))
+                            .lineLimit(1).truncationMode(.middle)
+                        if job.voiceMemo != nil { VoiceMemoBadge(text: "Voice Memo", kind: .source) }
+                    }
                     Text(subtitle).font(.caption).foregroundStyle(theme.secondaryText)
                     if case .failed(let message) = job.state {
                         Text(message).font(.caption).foregroundStyle(theme.danger)
@@ -109,8 +112,12 @@ struct QueueRow: View {
         case .waiting:
             Button("Remove") { pendingConfirmation = store.request(.remove(job)) }
                 .buttonStyle(.themedSecondary)
-                .accessibilityLabel("Remove \(job.audio.lastPathComponent) from the queue")
-        case .failed:
+                .accessibilityLabel("Remove \(job.displayName) from the queue")
+        case .failed(let message):
+            if job.voiceMemo != nil, message == VoiceMemoImportError.accessMessage {
+                Button("Set up access…") { store.model.showVoiceMemoImport = true }
+                    .buttonStyle(.themedSecondary)
+            }
             Button("Show log") { NSWorkspace.shared.open(store.logURL(for: job.id)) }
                 .buttonStyle(.themedSecondary)
             Button("Retry") { store.retry(job.id) }
@@ -138,7 +145,7 @@ struct QueueRow: View {
         .focused($removeFocused)
         .opacity(visible ? 1 : 0)
         .help("Remove from the list")
-        .accessibilityLabel("Remove “\(job.audio.lastPathComponent)” from the list")
+        .accessibilityLabel("Remove “\(job.displayName)” from the list")
     }
 }
 

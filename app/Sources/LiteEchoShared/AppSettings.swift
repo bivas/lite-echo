@@ -54,6 +54,40 @@ public final class AppSettings {
     /// Colour theme of every window; unknown stored values fall back to Professional.
     public var theme: Theme { didSet { defaults.set(theme.rawValue, forKey: Keys.theme) } }
 
+    // MARK: Voice Memos
+
+    /// Add new Voice Memos to the queue automatically. Turning it on remembers the moment:
+    /// only memos recorded after it are added.
+    public var autoImportVoiceMemos: Bool {
+        didSet {
+            defaults.set(autoImportVoiceMemos, forKey: Keys.autoImport)
+            if autoImportVoiceMemos, !oldValue { autoImportSince = Date() }
+        }
+    }
+    /// When auto-import was last turned on.
+    public private(set) var autoImportSince: Date? {
+        didSet { defaults.set(autoImportSince?.timeIntervalSince1970, forKey: Keys.autoImportSince) }
+    }
+    /// nil = all folders.
+    public var autoImportFolderID: String? { didSet { defaults.set(autoImportFolderID, forKey: Keys.autoImportFolder) } }
+    public var autoImportMinimumLength: VoiceMemoMinimumLength {
+        didSet { defaults.set(autoImportMinimumLength.rawValue, forKey: Keys.autoImportMinimum) }
+    }
+    /// Where imported memos are saved; nil = `~/Documents/LiteEcho Transcripts`.
+    public var voiceMemoOutputFolder: URL? {
+        didSet { defaults.set(voiceMemoOutputFolder?.path, forKey: Keys.voiceMemoFolder) }
+    }
+
+    public var autoImportPolicy: AutoImportPolicy {
+        AutoImportPolicy(enabled: autoImportVoiceMemos, since: autoImportSince, folderID: autoImportFolderID,
+                         minimumLength: autoImportMinimumLength)
+    }
+
+    /// Options for a Voice Memo added now (saved in the Voice Memos folder, not "next to the audio").
+    public var newVoiceMemoOptions: JobOptions {
+        JobOptions(language: defaultLanguage, speakers: defaultSpeakers, outputFolder: voiceMemoOutputFolder)
+    }
+
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaultLanguage = defaults.string(forKey: Keys.language).map(LanguageChoice.init(code:)) ?? .auto
@@ -84,6 +118,11 @@ public final class AppSettings {
         whisperModelDir = defaults.string(forKey: Keys.whisperDir).map { URL(fileURLWithPath: $0, isDirectory: true) }
         pyannoteModelDir = defaults.string(forKey: Keys.pyannoteDir).map { URL(fileURLWithPath: $0, isDirectory: true) }
         theme = Theme(rawValue: defaults.string(forKey: Keys.theme) ?? "") ?? .default
+        autoImportVoiceMemos = defaults.object(forKey: Keys.autoImport) as? Bool ?? false
+        autoImportSince = (defaults.object(forKey: Keys.autoImportSince) as? Double).map { Date(timeIntervalSince1970: $0) }
+        autoImportFolderID = defaults.string(forKey: Keys.autoImportFolder)
+        autoImportMinimumLength = VoiceMemoMinimumLength(rawValue: defaults.integer(forKey: Keys.autoImportMinimum)) ?? .any
+        voiceMemoOutputFolder = defaults.string(forKey: Keys.voiceMemoFolder).map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
 
     /// The custom folder of a model kind ("whisper" or "pyannote"); nil = LiteEcho's folder.
@@ -146,5 +185,10 @@ public final class AppSettings {
         static let theme = "theme"
         static let whisperDir = "whisperModelDir"
         static let pyannoteDir = "pyannoteModelDir"
+        static let autoImport = "autoImportVoiceMemos"
+        static let autoImportSince = "autoImportVoiceMemosSince"
+        static let autoImportFolder = "autoImportVoiceMemosFolder"
+        static let autoImportMinimum = "autoImportVoiceMemosMinimum"
+        static let voiceMemoFolder = "voiceMemoOutputFolder"
     }
 }

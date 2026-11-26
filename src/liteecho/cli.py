@@ -5,7 +5,9 @@ import json
 import os
 import sys
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 
 MAX_SPEAKERS = 20
@@ -59,13 +61,34 @@ def speaker_settings(args) -> tuple[dict, str]:
     return {}, "auto"
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="liteecho",
-                                description="Transcribe audio to an HTML transcript.",
-                                epilog="Download the models once with: liteecho fetch-models")
-    p.add_argument("input", help="audio file (.m4a or anything PyAV can read)")
+@dataclass
+class Job:
+    """One transcription. `input` is the audio to decode; with `prepare`, it is produced inside a
+    private temp dir (removed afterwards) by `prepare(tmp_dir)` instead."""
+    input: Path | None
+    audio_path: str                      # shown in the page and the liteecho:audio meta
+    title: str
+    out_dir: Path
+    out_stem: str
+    unique: bool = False                 # never overwrite: append " 2", " 3", ...
+    extra_meta: list[tuple[str, str]] = field(default_factory=list)
+    prepare: Callable[[Path], Path] | None = None
+
+
+class JobError(Exception):
+    """A failure with a machine-readable code, sent as the error event's `detail`."""
+
+    def __init__(self, message: str, code: str):
+        super().__init__(message)
+        self.code = code
+
+
+def add_transcribe_options(p: argparse.ArgumentParser, output_help: str | None = None) -> None:
     p.add_argument("--output-folder", default=None,
-                   help="output folder (default: the input file's folder); file is <stem>.html")
+                   help=output_help or "output folder (default: the input file's folder); "
+                                       "file is <stem>.html")
+    p.add_argument("--title", default=None,
+                   help="transcript title (<title> and <h1>; default: the input file's stem)")
     p.add_argument("--language", type=_language, default="auto",
                    help="'auto' or any Whisper language code or English name, e.g. he, en, "
                         "German (default: auto)")
@@ -90,12 +113,37 @@ def build_parser() -> argparse.ArgumentParser:
                         "lines (stage/speakers/language/done/error); logs stay on stderr")
     # Test hook: JSON list of segments decoded by random sampling (see render.sampled_windows).
     p.add_argument("--sampled-report", default=None, help=argparse.SUPPRESS)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="liteecho",
+                                description="Transcribe audio to an HTML transcript.",
+                                epilog="Download the models once with: liteecho fetch-models "
+                                       "| Voice Memos: liteecho voice-memos {list,import}")
+    p.add_argument("input", help="audio file (.m4a or anything PyAV can read)")
+    add_transcribe_options(p)
     return p
 
 
 def _events_requested(argv: list[str]) -> bool:
     return any(a == "--events=jsonl" or (a == "--events" and i + 1 < len(argv) and argv[i + 1] == "jsonl")
                for i, a in enumerate(argv))
+
+
+def parse_with_sink(parser: argparse.ArgumentParser, argv: list[str], sink):
+    """parse_args plus speaker settings; in events mode, usage errors become error events."""
+    if sink is not None:
+        def _error(message: str):
+            print(f"liteecho: error: {message}", file=sys.stderr)
+            sink.error(message, None)
+            raise SystemExit(1)
+        parser.error = _error  # type: ignore[method-assign]
+    args = parser.parse_args(argv)
+    try:
+        args.diarize_kwargs, args.speakers_mode = speaker_settings(args)
+    except ValueError as exc:
+        parser.error(str(exc))
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -109,27 +157,31 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "rename-speakers":
         from liteecho.rename import main as rename_main
         return rename_main(argv[1:])
+    if argv and argv[0] == "voice-memos":
+        from liteecho.voicememos import main as vm_main
+        return vm_main(argv[1:])
 
     from liteecho.events import EventSink
-    from liteecho.signals import Cancelled, sigterm_as_exception
 
     sink = EventSink() if _events_requested(argv) else None
     parser = build_parser()
-    if sink is not None:
-        def _error(message: str):
-            print(f"liteecho: error: {message}", file=sys.stderr)
-            sink.error(message, None)
-            raise SystemExit(1)
-        parser.error = _error  # type: ignore[method-assign]
-    args = parser.parse_args(argv)
-    try:
-        args.diarize_kwargs, args.speakers_mode = speaker_settings(args)
-    except ValueError as exc:
-        parser.error(str(exc))
+    args = parse_with_sink(parser, argv, sink)
+    inp = Path(args.input).expanduser()
+    if not inp.is_file():
+        parser.error(f"input file not found: {args.input}")
+    inp = inp.resolve()
+    job = Job(input=inp, audio_path=str(inp),
+              title=args.title if args.title is not None else inp.stem,
+              out_dir=Path(args.output_folder).expanduser() if args.output_folder else inp.parent,
+              out_stem=inp.stem)
+    return execute(args, parser, sink, job)
 
+
+def execute(args, parser: argparse.ArgumentParser, sink, job: Job) -> int:
+    from liteecho.signals import Cancelled, sigterm_as_exception
     try:
         with sigterm_as_exception():
-            return _run(args, parser, sink)
+            return _run(args, parser, sink, job)
     except KeyboardInterrupt as exc:  # Ctrl-C or SIGTERM; `finally` blocks in _run have run
         print("liteecho: cancelled", file=sys.stderr)
         if sink:
@@ -137,7 +189,24 @@ def main(argv: list[str] | None = None) -> int:
         return 143 if isinstance(exc, Cancelled) else 130
 
 
-def _run(args, parser: argparse.ArgumentParser, sink) -> int:
+def _write_output(job: Job, html: str) -> Path:
+    job.out_dir.mkdir(parents=True, exist_ok=True)
+    if not job.unique:
+        out = job.out_dir / f"{job.out_stem}.html"
+        out.write_text(html, encoding="utf-8")
+        return out
+    n = 1
+    while True:
+        out = job.out_dir / (f"{job.out_stem}.html" if n == 1 else f"{job.out_stem} {n}.html")
+        try:
+            with open(out, "x", encoding="utf-8") as fh:  # exclusive: never overwrite
+                fh.write(html)
+            return out
+        except FileExistsError:
+            n += 1
+
+
+def _run(args, parser: argparse.ArgumentParser, sink, job: Job) -> int:
     from liteecho.resources import ModelsNotFound, resolve
     from liteecho.workers import WorkerError
 
@@ -147,20 +216,16 @@ def _run(args, parser: argparse.ArgumentParser, sink) -> int:
             sink.error(message, detail)
         return 1
 
-    inp = Path(args.input).expanduser()
-    if not inp.is_file():
-        parser.error(f"input file not found: {args.input}")
-    inp = inp.resolve()
     try:
         paths = resolve(args.models_dir, args.whisper_dir, args.pyannote_dir)
     except ModelsNotFound as exc:
         if sink:
             return fail(str(exc))
         parser.exit(2, f"liteecho: error: {exc}\n")
-    out_dir = Path(args.output_folder).expanduser() if args.output_folder else inp.parent
     language = None if args.language == "auto" else args.language
 
     wav = None
+    tmp_dir = None
     try:
         # Heavy imports after argument validation.
         from liteecho.audio import convert_to_wav
@@ -174,8 +239,13 @@ def _run(args, parser: argparse.ArgumentParser, sink) -> int:
         def audio_progress(stage: str, desc: str):
             return AudioEvents(sink, stage) if sink else AudioBar(desc)
 
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_file = out_dir / f"{inp.stem}.html"
+        if job.prepare is not None:
+            tmp_dir = tempfile.mkdtemp(prefix="liteecho_src_")
+            inp = job.prepare(Path(tmp_dir))
+        else:
+            inp = job.input
+        if not job.unique:
+            job.out_dir.mkdir(parents=True, exist_ok=True)
 
         # Created here (not inside convert_to_wav) so a cancel during conversion still removes it.
         fd, wav = tempfile.mkstemp(prefix="liteecho_", suffix=".wav")
@@ -214,12 +284,12 @@ def _run(args, parser: argparse.ArgumentParser, sink) -> int:
         if sink:
             sink.stage("pauses", duration, duration, "s")
 
-        opts = RenderOptions(title=inp.stem, audio_path=str(inp), language=lang or language or "",
+        opts = RenderOptions(title=job.title, audio_path=job.audio_path, language=lang or language or "",
                              language_mode="auto" if language is None else "fixed",
                              speakers_mode=args.speakers_mode, duration_ms=int(round(duration * 1000)),
-                             transcript_start_ms=start_ms)
+                             transcript_start_ms=start_ms, extra_meta=list(job.extra_meta))
         html = render_html(segments, diar, chunks, opts)
-        out_file.write_text(html, encoding="utf-8")
+        out_file = _write_output(job, html)
         report = None
         if args.sampled_report or sink:
             report = sampled_windows(segments, opts)
@@ -230,6 +300,8 @@ def _run(args, parser: argparse.ArgumentParser, sink) -> int:
         if sink:
             sink.done(output=os.path.abspath(out_file),
                       sampled=[{"start_ms": w["start_ms"], "end_ms": w["end_ms"]} for w in report])
+    except JobError as exc:
+        return fail(str(exc), exc.code)
     except WorkerError as exc:
         log(exc.child_traceback.rstrip() or str(exc))
         return fail(str(exc), exc.child_traceback.rstrip() or None)
@@ -243,6 +315,9 @@ def _run(args, parser: argparse.ArgumentParser, sink) -> int:
     finally:
         if wav and os.path.exists(wav):
             os.remove(wav)
+        if tmp_dir:
+            import shutil
+            shutil.rmtree(tmp_dir, ignore_errors=True)
     return 0
 
 

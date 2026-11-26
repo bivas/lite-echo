@@ -91,3 +91,65 @@ One self-contained file, `<stem>.html`, meant to be read in a browser.
 | Conversation | `--speakers 2` |
 | Meeting | `--min-speakers 3 --max-speakers 8` |
 | Custom | exact N (1–20) or a range |
+
+## Voice Memos (contract v1)
+
+The engine reads Apple's Voice Memos library **read-only**, through a private copy of its database.
+The app talks to it only through these commands.
+
+### `liteecho voice-memos list --json [--library DIR]`
+
+The default `--library` is `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings`.
+It prints one JSON object to stdout and always exits 0 when it could answer, including when access is
+denied:
+
+```json
+{"status": "ok" | "no-access" | "no-library" | "unreadable",
+ "detail": "human-readable reason (no recording data)",
+ "folders": [{"id": "<uuid>", "name": "Work"}],
+ "memos": [{
+   "id": "<ZUNIQUEID>",            // stable, the dedupe key
+   "title": "Customer call",        // never empty; falls back to "New Recording" style label
+   "recorded": "2026-11-26T08:42:00Z",
+   "duration_s": 1311.4,
+   "folder_id": "<uuid>" | null,
+   "favorite": true,
+   "local": true,                   // audio file present on this Mac
+   "apple_transcript": false,       // best effort; false when unknown
+   "format": "m4a" | "qta"
+ }]}
+```
+
+- **Excluded:** memos in Recently Deleted and memos still being recorded.
+- **Order:** newest first.
+- **Status `no-access`:** the library exists but reading it is denied (EPERM), so Full Disk Access is
+  needed.
+- **Status `no-library`:** the library does not exist (ENOENT).
+
+### `liteecho voice-memos import ID [--output-folder DIR] [transcribe options…] [--events jsonl]`
+
+- It runs one transcription of the memo with that ID, using the normal transcribe options
+  (`--language`, `--speakers`, `--min-speakers` and `--max-speakers`).
+- The audio is copied to a temporary file first; Apple's files are never opened for writing.
+- The output file is `<output-folder>/<sanitised title> (<YYYY-MM-DD HHMM>).html`. The default output
+  folder is `~/Documents/LiteEcho Transcripts`.
+- Events are the same as transcribe.
+- Errors arrive as an `error` event with `detail` set to one of these codes, and the exit code is 1:
+  - `no-access`: Full Disk Access is needed
+  - `not-found`: no memo with that ID, or no library
+  - `not-local`: the audio is only in iCloud, or its path is unsafe
+  - `unreadable`: the database copy is corrupt or its layout is unknown
+  - `unsupported-format`: the audio can't be decoded
+- Layered `.qta` memos: only the first audio track is transcribed.
+
+### Extra transcript meta for imported memos
+
+```
+<meta name="liteecho:source" content="voice-memos" />
+<meta name="liteecho:source-id" content="{memo id}" />
+<meta name="liteecho:recorded" content="{ISO-8601 UTC}" />
+<meta name="liteecho:source-folder" content="{folder name}" />   (omitted when none)
+```
+
+The `<h1>` title is the memo title. The main command also accepts `--title TEXT` to override the
+title, which by default is the file stem.

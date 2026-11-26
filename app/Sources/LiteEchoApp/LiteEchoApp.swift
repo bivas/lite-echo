@@ -22,6 +22,8 @@ struct LiteEchoApp: App {
         _model = StateVar(initialValue: model)
         _queue = StateVar(initialValue: queue)
         AppDelegate.queue = queue
+        // Checks Voice Memos for new recordings when the user turned auto-import on.
+        queue.startVoiceMemoAutoImport()
     }
 
     var body: some Scene {
@@ -33,6 +35,7 @@ struct LiteEchoApp: App {
                 .themed(model.settings)
         }
         .defaultSize(width: 1180, height: 760)
+        .commands { VoiceMemoCommands(model: model) }
 
         Settings {
             SettingsView()
@@ -51,6 +54,24 @@ struct LiteEchoApp: App {
             MenuBarLabel(store: queue)
         }
         .menuBarExtraStyle(.window)
+    }
+}
+
+/// File › Import from Voice Memos… (⇧⌘I): opens the main window and its Voice Memos sheet.
+struct VoiceMemoCommands: Commands {
+    let model: AppModel
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(after: .newItem) {
+            Button("Import from Voice Memos…") {
+                model.showVoiceMemoImport = true
+                openWindow(id: WindowID.main)
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            .keyboardShortcut("i", modifiers: [.command, .shift])
+            .disabled(model.needsSetup)
+        }
     }
 }
 

@@ -114,5 +114,6 @@ out the window with Finder. If the Finder step fails, it falls back to a plain D
 
 ## Research
 
-- [Importing from Voice Memos](docs/research/voice-memos.md): it is feasible, but needs Full Disk
-  Access. The note covers which metadata is available.
+- [Importing from Voice Memos](docs/research/voice-memos.md): background on the private library format.
+  The feature now exists (`src/liteecho/voicememos.py`, `liteecho voice-memos …`, and the app's import
+  sheet). The contract is in [docs/transcript-format.md](docs/transcript-format.md#voice-memos-contract-v1).

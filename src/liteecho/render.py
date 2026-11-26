@@ -267,6 +267,7 @@ def render_html(segments: list[Segment], diar: list[DiarSeg], chunks: list[dict]
         f'<meta name="liteecho:speakers-mode" content="{_e(opts.speakers_mode)}" />',
         f'<meta name="liteecho:duration-ms" content="{_e(int(opts.duration_ms))}" />',
         f'<meta name="liteecho:created" content="{_e(created)}" />',
+        *(f'<meta name="{_e(k)}" content="{_e(v)}" />' for k, v in opts.extra_meta),
         f"<title>{_e(opts.title)}</title>",
         f"<style>{_css(n)}</style>",
         "</head>",

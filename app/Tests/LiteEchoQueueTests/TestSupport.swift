@@ -61,6 +61,16 @@ struct Fixture {
     dir=$(dirname "$0")
     { echo RUN; for a in "$@"; do printf '%s\\n' "$a"; done; } >> "$dir/argv.log"
     out="${1%.*}.html"
+    if [ "$1" = "voice-memos" ]; then
+      case "$3" in
+      *fail*)
+        echo '{"type":"error","message":"raw message","detail":"not-local"}'
+        exit 1;;
+      esac
+      echo '{"type":"language","code":"en"}'
+      printf '{"type":"done","output":"%s/memo-out.html","sampled":[]}\\n' "$dir"
+      exit 0
+    fi
     case "$1" in
     *fail*)
       echo '{"type":"stage","stage":"convert","completed":1,"total":2,"unit":"steps"}'

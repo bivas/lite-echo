@@ -75,3 +75,30 @@ import LiteEchoCore
     #expect(LanguageRows.build(languages: languages, recents: [], query: "detect").map(\.id) == ["detect-auto"])
     #expect(LanguageRows.build(languages: languages, recents: [], query: "zzz").isEmpty)
 }
+
+@MainActor @Test func voiceMemoAutoImportRemembersWhenItWasTurnedOn() {
+    let suite = "liteecho.tests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let s = AppSettings(defaults: defaults)
+    #expect(!s.autoImportVoiceMemos && s.autoImportSince == nil && s.autoImportFolderID == nil)
+    #expect(s.autoImportMinimumLength == .any && s.voiceMemoOutputFolder == nil)
+    #expect(s.autoImportPolicy == AutoImportPolicy(enabled: false, since: nil))
+    let before = Date()
+    s.autoImportVoiceMemos = true
+    let since = s.autoImportSince
+    #expect(since != nil && since! >= before && since! <= Date())
+    s.autoImportFolderID = "work"
+    s.autoImportMinimumLength = .oneMinute
+    s.voiceMemoOutputFolder = URL(fileURLWithPath: "/Users/me/Memos", isDirectory: true)
+    let again = AppSettings(defaults: defaults)
+    #expect(again.autoImportVoiceMemos && again.autoImportFolderID == "work" && again.autoImportMinimumLength == .oneMinute)
+    #expect(abs(again.autoImportSince!.timeIntervalSince(since!)) < 0.001)
+    #expect(again.newVoiceMemoOptions.outputFolder?.path == "/Users/me/Memos")
+    // Setting it on again while on does not move the moment; off then on does.
+    again.autoImportVoiceMemos = true
+    #expect(abs(again.autoImportSince!.timeIntervalSince(since!)) < 0.001)
+    again.autoImportVoiceMemos = false
+    again.autoImportVoiceMemos = true
+    #expect(again.autoImportSince! >= since!)
+}

@@ -91,8 +91,13 @@ public enum QueueFormat {
 
     /// "48:12 · Hebrew (detected) · 2 speakers (detected) · finished in 14 min"
     public static func subtitle(for job: Job, duration: TimeInterval?, finishedIn took: TimeInterval?,
-                                languages: [LanguageInfo] = []) -> String {
+                                languages: [LanguageInfo] = [], now: Date = Date(),
+                                calendar: Calendar = .current) -> String {
         var parts: [String] = []
+        // A Voice Memo row starts with when it was recorded.
+        if let memo = job.voiceMemo {
+            parts.append(VoiceMemoFormat.relativeDate(memo.recorded, now: now, calendar: calendar))
+        }
         if let duration { parts.append(self.duration(duration)) }
         parts.append(languagePart(for: job, languages: languages))
         parts.append(speakersPart(for: job))
@@ -121,7 +126,7 @@ public enum QueueFormat {
     public static func statusBar(jobs: [Job], isPaused: Bool, languages: [LanguageInfo] = []) -> String {
         if let index = jobs.firstIndex(where: isRunning) {
             let job = jobs[index]
-            let parts = ["Transcribing “\(job.audio.lastPathComponent)”", languagePart(for: job, languages: languages),
+            let parts = ["Transcribing “\(job.displayName)”", languagePart(for: job, languages: languages),
                          speakersPart(for: job), "\(index + 1) of \(jobs.count)"]
             return parts.joined(separator: " · ")
         }
@@ -225,12 +230,12 @@ public enum PendingConfirmation: Equatable, Sendable {
     /// Remove all finished rows.
     case clearFinished(done: Int, failed: Int, cancelled: Int)
 
-    public static func stop(_ job: Job) -> Self { .stop(id: job.id, name: job.audio.lastPathComponent) }
+    public static func stop(_ job: Job) -> Self { .stop(id: job.id, name: job.displayName) }
 
     public static func remove(_ job: Job) -> Self {
         var transcribed = false
         if case .done = job.state { transcribed = true }
-        return .remove(id: job.id, name: job.audio.lastPathComponent, finished: job.state.isFinished,
+        return .remove(id: job.id, name: job.displayName, finished: job.state.isFinished,
                        transcribed: transcribed)
     }
 
