@@ -136,37 +136,20 @@ public final class AppModel {
     /// Runs a short command and returns its stdout.
     public nonisolated static func capture(executable: URL, arguments: [String],
                                     environment: [String: String]) async throws -> Data {
-        try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            process.executableURL = executable
-            process.arguments = arguments
-            var env = ["PATH": "/usr/bin:/bin", "PYTHONUNBUFFERED": "1"]
-            for key in ["HOME", "LANG", "TMPDIR", "USER"] {
-                if let value = ProcessInfo.processInfo.environment[key] { env[key] = value }
-            }
-            process.environment = env.merging(environment) { $1 }
-            let out = Pipe()
-            process.standardOutput = out
-            process.standardError = FileHandle.nullDevice
-            // Read while the process runs: a long answer (a big Voice Memos list) would otherwise
-            // fill the pipe and block the engine forever.
-            let collected = CaptureBuffer()
-            out.fileHandleForReading.readabilityHandler = { handle in
-                let chunk = handle.availableData
-                if !chunk.isEmpty { collected.append(chunk) }
-            }
-            process.terminationHandler = { proc in
-                out.fileHandleForReading.readabilityHandler = nil
-                collected.append(out.fileHandleForReading.readDataToEndOfFile())
-                let data = collected.data
-                if proc.terminationStatus == 0 {
-                    continuation.resume(returning: data)
-                } else {
-                    continuation.resume(throwing: CaptureError.exit(proc.terminationStatus))
-                }
-            }
-            do { try process.run() } catch { continuation.resume(throwing: error) }
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        var env = ["PATH": "/usr/bin:/bin", "PYTHONUNBUFFERED": "1"]
+        for key in ["HOME", "LANG", "TMPDIR", "USER"] {
+            if let value = ProcessInfo.processInfo.environment[key] { env[key] = value }
         }
+        process.environment = env.merging(environment) { $1 }
+        // Read while the process runs: a long answer (a big Voice Memos list) would otherwise
+        // fill the pipe and block the engine forever.
+        let collected = CaptureBuffer()
+        let status = try await ChildProcess.run(process, stdout: { collected.append($0) }, stderr: nil)
+        guard status == 0 else { throw CaptureError.exit(status) }
+        return collected.data
     }
 
     public enum CaptureError: Error { case exit(Int32) }

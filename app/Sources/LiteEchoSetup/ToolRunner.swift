@@ -1,4 +1,5 @@
 import Foundation
+import LiteEchoCore
 
 /// Runs one helper executable (the bundled `uv`) with an explicit environment and reports
 /// stderr lines as they arrive. Arguments are an array; no shell is involved.
@@ -60,32 +61,17 @@ final class ToolProcess: @unchecked Sendable {
     func run() async throws -> Result {
         if isCancelled { throw CancellationError() }
 
-        let stderr = Pipe()
-        process.standardError = stderr
-        process.standardOutput = FileHandle.nullDevice
-        process.standardInput = FileHandle.nullDevice
-        stderr.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let chunk = handle.availableData
-            if !chunk.isEmpty { self?.consume(chunk) }
-        }
-        let result: Result = try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { [weak self] proc in
-                stderr.fileHandleForReading.readabilityHandler = nil
-                guard let self else { return }
-                self.consume(stderr.fileHandleForReading.readDataToEndOfFile(), flush: true)
-                self.lock.lock()
-                let text = String(decoding: self.tail, as: UTF8.self)
-                self.lock.unlock()
-                continuation.resume(returning: Result(exitCode: proc.terminationStatus, stderrTail: text))
-            }
-            do {
-                try process.run()
-            } catch {
-                process.terminationHandler = nil
-                stderr.fileHandleForReading.readabilityHandler = nil
-                continuation.resume(throwing: error)
-            }
-        }
+        let exitCode = try await ChildProcess.run(process, stdout: nil, stderr: { [weak self] chunk in
+            self?.consume(chunk)
+        }, afterLaunch: { [weak self] in
+            // A cancel() that arrived before launch must still stop the process.
+            guard let self, self.isCancelled else { return }
+            self.process.terminate()
+        })
+        consume(Data(), flush: true)
+        lock.lock()
+        let result = Result(exitCode: exitCode, stderrTail: String(decoding: tail, as: UTF8.self))
+        lock.unlock()
         if isCancelled { throw CancellationError() }
         return result
     }
