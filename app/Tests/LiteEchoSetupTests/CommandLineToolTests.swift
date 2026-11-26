@@ -141,3 +141,29 @@ struct CommandLineToolTests {
         #expect(!r.path.isEmpty)
     }
 }
+
+@Suite struct CommandLineFlavorTests {
+    @Test func devInstallsUnderItsOwnName() {
+        let home = URL(fileURLWithPath: "/tmp/liteecho-home", isDirectory: true)
+        let engine = URL(fileURLWithPath: "/tmp/LiteEcho Dev/engine/bin/liteecho")
+        let dev = CommandLineInstaller(home: home, engineBinary: engine, commandName: "liteecho-dev")
+        #expect(dev.linkURL.lastPathComponent == "liteecho-dev")
+        let release = CommandLineInstaller(home: home, engineBinary: engine, commandName: "liteecho")
+        #expect(release.linkURL.lastPathComponent == "liteecho")
+    }
+
+    @Test func linkIsOursOnlyForThisFlavorsEngine() {
+        let devEngine = URL(fileURLWithPath: "/Users/x/Library/Application Support/LiteEcho Dev/engine/bin/liteecho")
+        #expect(CommandLineInstaller.isOurs(destination: devEngine.path, engineBinary: devEngine,
+                                            supportFolderName: "LiteEcho Dev"))
+        // A dev build never claims the release's link.
+        #expect(!CommandLineInstaller.isOurs(
+            destination: "/Users/x/Library/Application Support/LiteEcho/engine/bin/liteecho", engineBinary: devEngine,
+            supportFolderName: "LiteEcho Dev"))
+    }
+
+    @Test func probeScriptUsesTheCommandName() {
+        #expect(LoginShellProbe.script(for: "liteecho-dev").hasSuffix("command -v liteecho-dev || true"))
+        #expect(LoginShellProbe.script(for: "liteecho").hasSuffix("command -v liteecho || true"))
+    }
+}

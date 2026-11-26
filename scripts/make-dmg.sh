@@ -12,7 +12,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$ROOT/build"
 APP="$BUILD/LiteEcho.app"
-[[ -d "$APP" ]] || { echo "missing $APP; run scripts/build-app.sh first" >&2; exit 1; }
+[[ -d "$APP" ]] || { echo "missing $APP; run scripts/build-app.sh --release first" >&2; exit 1; }
 
 VERSION="${LITEECHO_VERSION:-}"
 VERSION="${VERSION#v}"

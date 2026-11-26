@@ -1,3 +1,4 @@
+import LiteEchoCore
 import Foundation
 
 /// Installs the `liteecho` command as a symlink in ~/.local/bin.
@@ -29,20 +30,33 @@ public struct CommandLineInstaller: Sendable {
     public let home: URL
     public let engineBinary: URL
 
-    public init(home: URL = FileManager.default.homeDirectoryForCurrentUser, engineBinary: URL) {
+    /// `liteecho`, or `liteecho-dev` for a dev build, so the two never replace each other.
+    public let commandName: String
+
+    public init(home: URL = FileManager.default.homeDirectoryForCurrentUser, engineBinary: URL,
+                commandName: String = AppFlavor.current.commandName) {
         self.home = home
         self.engineBinary = engineBinary
+        self.commandName = commandName
     }
 
     public var binDir: URL { home.appendingPathComponent(".local/bin", isDirectory: true) }
-    public var linkURL: URL { binDir.appendingPathComponent("liteecho") }
+    public var linkURL: URL { binDir.appendingPathComponent(commandName) }
 
-    private func isOurs(destination: String) -> Bool {
-        Self.isOurs(destination: destination, engineBinary: engineBinary)
+    /// The support folder of the build this command belongs to ("LiteEcho" or "LiteEcho Dev").
+    private var supportFolderName: String {
+        commandName == AppFlavor.dev.commandName ? AppFlavor.dev.supportFolderName
+            : AppFlavor.release.supportFolderName
     }
 
-    static func isOurs(destination: String, engineBinary: URL) -> Bool {
-        destination == engineBinary.path || destination.hasSuffix("/LiteEcho/engine/bin/liteecho")
+    private func isOurs(destination: String) -> Bool {
+        Self.isOurs(destination: destination, engineBinary: engineBinary, supportFolderName: supportFolderName)
+    }
+
+    /// This app's engine, or the engine in this flavor's usual support folder (an older path).
+    static func isOurs(destination: String, engineBinary: URL,
+                       supportFolderName: String = AppFlavor.release.supportFolderName) -> Bool {
+        destination == engineBinary.path || destination.hasSuffix("/\(supportFolderName)/engine/bin/liteecho")
     }
 
     /// True only when `linkURL` is a symlink that points at this app's engine (directly, by an

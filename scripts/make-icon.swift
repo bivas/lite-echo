@@ -1,5 +1,6 @@
 // Renders the LiteEcho app icon ("Wave face", option B) into an .iconset folder.
-// Usage: swift scripts/make-icon.swift <out.iconset>   (then: iconutil -c icns <out.iconset>)
+// Usage: swift scripts/make-icon.swift <out.iconset> [--dev]   (then: iconutil -c icns <out.iconset>)
+// --dev adds an orange "DEV" band, used for local builds ("LiteEcho Dev").
 //
 // Artwork is in the design's 100-unit space (y down). Small sizes use simpler variants
 // so the face stays legible: 3 bars at <=32 px, 5 bars at <=64 px, the full face above.
@@ -60,6 +61,40 @@ func draw(_ ctx: CGContext, px: Int) {
     }
 }
 
+/// An orange band across the bottom of the tile reading "DEV" (just the band at tiny sizes).
+func drawDevBand(_ ctx: CGContext, gc: NSGraphicsContext, px: Int) {
+    let s = CGFloat(px)
+    let tile = s * 824 / 1024
+    let origin = (s - tile) / 2
+    let radius = tile * 22 / 96
+    let bandHeight = tile * 0.24
+    let band = CGRect(x: origin, y: origin + tile - bandHeight, width: tile, height: bandHeight)
+    ctx.saveGState()
+    // Keep the band inside the tile's rounded corners.
+    ctx.addPath(CGPath(roundedRect: CGRect(x: origin, y: origin, width: tile, height: tile),
+                       cornerWidth: radius, cornerHeight: radius, transform: nil))
+    ctx.clip()
+    ctx.setFillColor(CGColor(red: 0xF9 / 255, green: 0x73 / 255, blue: 0x16 / 255, alpha: 1))
+    ctx.fill(band)
+    ctx.restoreGState()
+    guard px >= 64 else { return }
+    let font = NSFont.systemFont(ofSize: bandHeight * 0.62, weight: .heavy)
+    let text = NSAttributedString(string: "DEV", attributes: [
+        .font: font, .foregroundColor: NSColor.white, .kern: bandHeight * 0.08,
+    ])
+    let size = text.size()
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = gc
+    // The context is flipped (y down); draw the text in a flipped-aware way.
+    ctx.saveGState()
+    ctx.translateBy(x: 0, y: s)
+    ctx.scaleBy(x: 1, y: -1)
+    let y = s - (band.midY + size.height / 2)
+    text.draw(at: NSPoint(x: (s - size.width) / 2, y: y + font.descender * -0.15))
+    ctx.restoreGState()
+    NSGraphicsContext.restoreGraphicsState()
+}
+
 func png(px: Int) -> Data {
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8,
                                samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
@@ -70,16 +105,19 @@ func png(px: Int) -> Data {
     ctx.scaleBy(x: 1, y: -1)   // y down, like the SVG
     ctx.setShouldAntialias(true)
     draw(ctx, px: px)
+    if devBadge { drawDevBand(ctx, gc: gc, px: px) }
     gc.flushGraphics()
     return rep.representation(using: .png, properties: [:])!
 }
 
-let args = CommandLine.arguments
-guard args.count == 2 else {
-    FileHandle.standardError.write("usage: make-icon.swift <out.iconset>\n".data(using: .utf8)!)
+var args = Array(CommandLine.arguments.dropFirst())
+let devBadge = args.contains("--dev")
+args.removeAll { $0 == "--dev" }
+guard args.count == 1 else {
+    FileHandle.standardError.write("usage: make-icon.swift <out.iconset> [--dev]\n".data(using: .utf8)!)
     exit(2)
 }
-let out = URL(fileURLWithPath: args[1])
+let out = URL(fileURLWithPath: args[0])
 try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
 for base in [16, 32, 128, 256, 512] {
     try png(px: base).write(to: out.appendingPathComponent("icon_\(base)x\(base).png"))

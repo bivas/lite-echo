@@ -68,7 +68,7 @@ jobs:
         env:
           LITEECHO_VERSION: ${{ steps.v.outputs.version }}
           MACOS_SIGN_IDENTITY: ${{ env.HAS_SIGNING == 'true' && secrets.MACOS_SIGN_IDENTITY || '' }}
-        run: scripts/build-app.sh
+        run: scripts/build-app.sh --release
 
       - name: Notarize and staple app
         if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'

@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# Builds build/LiteEcho.app with the Command Line Tools only (no Xcode).
+# Builds the macOS app with the Command Line Tools only (no Xcode).
 #
-#   scripts/build-app.sh            release build
-#   scripts/build-app.sh --debug    debug build (faster)
+#   scripts/build-app.sh             local build: build/LiteEcho Dev.app
+#   scripts/build-app.sh --release   the shipped app: build/LiteEcho.app (CI uses this)
+#   scripts/build-app.sh --debug     debug Swift build (faster); combines with either
+#   LITEECHO_FLAVOR=release          same as --release
+#
+# "LiteEcho Dev" has its own bundle id (dev.liteecho.app.dev), settings, queue, engine and
+# `liteecho-dev` command, so it runs next to an installed release instead of activating it.
+# It shares the release's models and download cache (see AppFlavor.swift).
 #   LITEECHO_VERSION=1.2.3 scripts/build-app.sh    stamp a version (also: --version 1.2.3);
 #                                   defaults to the version in pyproject.toml
 #
@@ -19,9 +25,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG=release
 APP_VERSION="${LITEECHO_VERSION:-}"
+FLAVOR="${LITEECHO_FLAVOR:-dev}"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --debug) CONFIG=debug ;;
+        --release) FLAVOR=release ;;
+        --dev) FLAVOR=dev ;;
         --version) APP_VERSION="${2:?--version needs a value}"; shift ;;
         --version=*) APP_VERSION="${1#--version=}" ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -29,14 +38,20 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+case "$FLAVOR" in
+    release) APP_NAME="LiteEcho"; BUNDLE_ID="dev.liteecho.app" ;;
+    dev) APP_NAME="LiteEcho Dev"; BUNDLE_ID="dev.liteecho.app.dev" ;;
+    *) echo "LITEECHO_FLAVOR must be release or dev, not '$FLAVOR'" >&2; exit 2 ;;
+esac
+
 BUILD="$ROOT/build"
-APP="$BUILD/LiteEcho.app"
+APP="$BUILD/$APP_NAME.app"
 CONTENTS="$APP/Contents"
 ENGINE="$CONTENTS/Resources/engine"
 VERSION="${APP_VERSION#v}"
 [[ -n "$VERSION" ]] || VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/pyproject.toml" | head -1)"
 [[ -n "$VERSION" ]] || { echo "could not determine version" >&2; exit 1; }
-echo "==> Version $VERSION"
+echo "==> $APP_NAME $VERSION ($FLAVOR)"
 
 echo "==> Swift build ($CONFIG)"
 swift build --package-path "$ROOT/app" -c "$CONFIG"
@@ -62,7 +77,12 @@ cp "$BUILD/requirements.txt" "$ENGINE/requirements.txt"
 cp "$BUILD/dist/$WHEEL" "$ENGINE/$WHEEL"
 echo "$WHEEL" > "$ENGINE/wheel.txt"
 echo "3.12" > "$ENGINE/python-version.txt"
-if [[ -f "$ROOT/app/Assets/AppIcon.icns" ]]; then
+if [[ "$FLAVOR" == dev ]]; then
+    # A "DEV" band on the icon tells the two apps apart in the Dock and Finder.
+    rm -rf "$BUILD/AppIcon-dev.iconset"
+    swift "$ROOT/scripts/make-icon.swift" "$BUILD/AppIcon-dev.iconset" --dev >/dev/null
+    iconutil -c icns "$BUILD/AppIcon-dev.iconset" -o "$CONTENTS/Resources/AppIcon.icns"
+elif [[ -f "$ROOT/app/Assets/AppIcon.icns" ]]; then
     cp "$ROOT/app/Assets/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 fi
 
@@ -71,9 +91,10 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>LiteEcho</string>
-    <key>CFBundleDisplayName</key><string>LiteEcho</string>
-    <key>CFBundleIdentifier</key><string>dev.liteecho.app</string>
+    <key>CFBundleName</key><string>$APP_NAME</string>
+    <key>CFBundleDisplayName</key><string>$APP_NAME</string>
+    <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
+    <key>LiteEchoFlavor</key><string>$FLAVOR</string>
     <key>CFBundleExecutable</key><string>LiteEcho</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>

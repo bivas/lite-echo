@@ -1,3 +1,4 @@
+import LiteEchoCore
 import SwiftUI
 import AppKit
 import LiteEchoShared
@@ -90,7 +91,14 @@ public enum LoginShellProbe {
         public var approximate: Bool
     }
 
-    static let script = #"printf 'LITEECHO_PATH=%s\n' "$PATH"; command -v liteecho || true"#
+    /// A fixed script: the command name is a constant of this build (liteecho or liteecho-dev),
+    /// never user input.
+    static var script: String { script(for: AppFlavor.current.commandName) }
+
+    static func script(for command: String) -> String {
+        precondition(command.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" }, "unsafe command name")
+        return #"printf 'LITEECHO_PATH=%s\n' "$PATH"; command -v "# + command + " || true"
+    }
     static let pathMarker = "LITEECHO_PATH="
 
     /// `$SHELL` if it is an absolute path listed in /etc/shells, else /bin/zsh.
@@ -264,7 +272,7 @@ public struct CommandLineToolSection: View {
             SectionLabel("Command-line tool")
         }
         .task { await refresh() }
-        .alert("Replace the existing “liteecho”?", isPresented: $confirmReplace) {
+        .alert("Replace the existing “\(AppFlavor.current.commandName)”?", isPresented: $confirmReplace) {
             Button("Replace", role: .destructive) { replace() }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -276,23 +284,23 @@ public struct CommandLineToolSection: View {
         switch s.status {
         case .installedOnPath:
             header(theme.success, "Installed and on your PATH",
-                   "Typing liteecho in Terminal runs this app's engine\(s.engineVersion.map { " (\($0))" } ?? "").")
-            Text("~/.local/bin/liteecho → LiteEcho engine").font(.callout.monospaced()).foregroundStyle(theme.secondaryText)
+                   "Typing \(AppFlavor.current.commandName) in Terminal runs this app's engine\(s.engineVersion.map { " (\($0))" } ?? "").")
+            Text("~/.local/bin/\(AppFlavor.current.commandName) → \(AppFlavor.current.displayName) engine").font(.callout.monospaced()).foregroundStyle(theme.secondaryText)
             actions {
                 Button("Reinstall") { install() }
                 Button("Uninstall") { uninstall() }
             }
         case .installedNotOnPath:
             header(theme.warning, "Installed, but not on your PATH",
-                   "Terminal doesn't search ~/.local/bin, so typing liteecho won't find it yet.")
+                   "Terminal doesn't search ~/.local/bin, so typing \(AppFlavor.current.commandName) won't find it yet.")
             pathHint(s.hint)
             actions {
                 Button("Check again") { Task { await refresh() } }
                 Button("Uninstall") { uninstall() }
             }
         case .otherOnPath(let command, let target, let replaceable):
-            header(theme.accent, "A different liteecho is on your PATH",
-                   "Terminal's first liteecho is not this app's engine.")
+            header(theme.accent, "A different \(AppFlavor.current.commandName) is on your PATH",
+                   "Terminal's first \(AppFlavor.current.commandName) is not this app's engine.")
             VStack(alignment: .leading, spacing: 2) {
                 Text(command.path).font(.callout.monospaced())
                 if target.path != command.path { Text("→ \(target.path)").font(.callout.monospaced()) }
@@ -311,9 +319,9 @@ public struct CommandLineToolSection: View {
             }
         case .notInstalled(let binDirOnPath, let foreignAtLink):
             header(theme.secondaryText, "Not installed",
-                   "Adds a liteecho command to Terminal that runs this app's engine.")
+                   "Adds a \(AppFlavor.current.commandName) command to Terminal that runs this app's engine.")
             if foreignAtLink {
-                Text("A different file already exists at ~/.local/bin/liteecho; you'll be asked before it is replaced.")
+                Text("A different file already exists at ~/.local/bin/\(AppFlavor.current.commandName); you'll be asked before it is replaced.")
                     .font(.callout).foregroundStyle(theme.secondaryText)
             }
             if binDirOnPath {
@@ -402,7 +410,7 @@ public struct CommandLineToolSection: View {
         do {
             let outcome = try installer.install {
                 let alert = NSAlert()
-                alert.messageText = "Replace the existing “liteecho”?"
+                alert.messageText = "Replace the existing “\(AppFlavor.current.commandName)”?"
                 alert.informativeText = "\(installer.linkURL.path) already exists and was not created by LiteEcho. Replace it with a link to the app's engine?"
                 alert.addButton(withTitle: "Replace")
                 alert.addButton(withTitle: "Cancel")
@@ -438,7 +446,7 @@ public struct CommandLineToolSection: View {
             case .notInstalled: messageIsError = false; message = "It was already removed."
             case .notOurs:
                 messageIsError = true
-                message = "~/.local/bin/liteecho isn't a link to this app's engine, so it was left alone."
+                message = "~/.local/bin/\(AppFlavor.current.commandName) isn't a link to this app's engine, so it was left alone."
             }
         } catch {
             messageIsError = true

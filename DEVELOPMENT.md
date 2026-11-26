@@ -20,13 +20,25 @@ Notes for building, testing and releasing LiteEcho. For using it, see the [READM
 ## Building the app
 
 ```bash
-scripts/build-app.sh          # → build/LiteEcho.app (add --debug for a faster build)
+scripts/build-app.sh          # → build/LiteEcho Dev.app (add --debug for a faster build)
+scripts/build-app.sh --release   # → build/LiteEcho.app, what CI ships
 scripts/test-app.sh           # Swift tests
 ```
 
 **What the build does:** `build-app.sh` builds the engine wheel and bundles it into
 `LiteEcho.app/Contents/Resources/engine`, together with `uv` and the pinned `requirements.txt`. On first
 launch the app builds its engine venv from those.
+
+**Dev and release builds:** local builds are **LiteEcho Dev**, with their own bundle id
+(`dev.liteecho.app.dev`), a DEV band on the icon, and their own settings, queue, engine, logs and
+Keychain item. Their data lives in `~/Library/Application Support/LiteEcho Dev`, and their
+command-line tool is `liteecho-dev`. So a dev build runs next to an installed release instead of
+bringing it to the front.
+
+The models and uv's download cache are shared with the release (in `…/LiteEcho`), so a dev build
+downloads nothing twice. Its first launch only installs its own engine, mostly from that cache.
+Pass `--release` (or set `LITEECHO_FLAVOR=release`) to build the real app; the release workflow
+and `make-dmg.sh` use that.
 
 **Options:**
 
@@ -105,7 +117,7 @@ With these repository secrets it is signed with a Developer ID and notarized:
 ### Building the DMG locally
 
 ```bash
-scripts/build-app.sh && scripts/make-dmg.sh   # → build/LiteEcho-<version>.dmg, .zip and .sha256
+scripts/build-app.sh --release && scripts/make-dmg.sh   # → build/LiteEcho-<version>.dmg, .zip and .sha256
 ```
 
 **The DMG window:** `make-dmg.sh` draws the background with `scripts/make-dmg-background.swift` and lays

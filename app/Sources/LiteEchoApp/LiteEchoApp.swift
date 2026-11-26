@@ -14,10 +14,15 @@ struct LiteEchoApp: App {
     @StateVar private var queue: QueueStore
 
     init() {
-        // Move data from the former "localScribe" install before anything reads it.
-        let migration = LaunchMigration.run()
+        let flavor = AppFlavor.current
+        KeychainStore.defaultService = flavor.keychainService
         let model = AppModel()
-        model.reinstallEngineWithoutAsking = migration.engineNeedsReinstall
+        if flavor == .release {
+            // Move data from the former "localScribe" install before anything reads it.
+            // Dev builds have their own folder and never touch it.
+            let migration = LaunchMigration.run()
+            model.reinstallEngineWithoutAsking = migration.engineNeedsReinstall
+        }
         let queue = QueueStore(model: model)
         _model = StateVar(initialValue: model)
         _queue = StateVar(initialValue: queue)
@@ -27,7 +32,7 @@ struct LiteEchoApp: App {
     }
 
     var body: some Scene {
-        Window("LiteEcho", id: WindowID.main) {
+        Window(AppFlavor.current.displayName, id: WindowID.main) {
             RootView(queue: queue)
                 .environment(model)
                 .environment(model.settings)
