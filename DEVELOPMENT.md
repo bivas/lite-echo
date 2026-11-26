@@ -93,7 +93,7 @@ the turns.
 the zip and their checksums. The tag must match `version` in `pyproject.toml`.
 
 ```bash
-git tag v0.3.0 && git push origin v0.3.0
+git tag v0.5.0 && git push origin v0.5.0
 ```
 
 **Signing:** without secrets, the build is ad-hoc signed, so users have to click **Open Anyway** once.

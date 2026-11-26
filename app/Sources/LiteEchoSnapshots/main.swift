@@ -84,7 +84,7 @@ struct Sample {
             pyannote = model(source: "missing", path: nil, verified: nil)
         }
         let json: [String: Any] = [
-            "version": "0.3.0", "python": "3.12.13",
+            "version": "0.5.0", "python": "3.12.13",
             "packages": ["faster-whisper": "1.2.1", "pyannote.audio": "4.0.7", "torch": "2.8.0",
                          "ctranslate2": "4.6.0", "numpy": "2.2.6"],
             "models_dir": paths.modelsDir.path,
@@ -311,7 +311,7 @@ let screens: [Screen] = [
     Screen(name: "preferences-cli") {
         try preferences(tab: .advanced, size: NSSize(width: 580, height: 460),
                         cli: CommandLineToolPreview(status: .installedOnPath, shellPath: "/bin/zsh",
-                                                    engineVersion: "0.3.0"))
+                                                    engineVersion: "0.5.0"))
     },
     Screen(name: "menubar-panel") {
         let sample = try Sample(theme: .professional, models: .bothReady, withQueue: true)
