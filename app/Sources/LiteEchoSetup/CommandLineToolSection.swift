@@ -166,12 +166,16 @@ enum ProcessRunner {
             box.lock.lock(); box.data = d; box.lock.unlock()
             reader.signal()
         }
-        if done.wait(timeout: .now() + timeout) == .timedOut {
+        // One deadline for both the process and reading its output. Reading can finish after the
+        // process exits on a busy machine, so never return early with whatever has arrived so far.
+        let deadline = DispatchTime.now() + timeout
+        if done.wait(timeout: deadline) == .timedOut {
             process.terminate()
             _ = done.wait(timeout: .now() + 1)
             return nil
         }
-        _ = reader.wait(timeout: .now() + 1)
+        // A child that outlives the shell can hold the pipe open; give up at the deadline then.
+        guard reader.wait(timeout: deadline) == .success else { return nil }
         guard process.terminationStatus == 0 else { return nil }
         box.lock.lock(); defer { box.lock.unlock() }
         return String(data: box.data, encoding: .utf8)
