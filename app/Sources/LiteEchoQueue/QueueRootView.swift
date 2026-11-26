@@ -9,6 +9,7 @@ public struct QueueRootView: View {
     private let store: QueueStore
     @StateVar private var isTargeted = false
     @StateVar private var isHovering = false
+    @StateVar private var pendingConfirmation: PendingConfirmation?
     @Environment(\.theme) private var theme
     @Environment(\.openSettings) private var openSettings
 
@@ -126,9 +127,10 @@ public struct QueueRootView: View {
             Text(store.jobs.count == 1 ? "1 file" : "\(store.jobs.count) files")
                 .font(.callout).foregroundStyle(theme.secondaryText)
             Spacer()
-            Button("Clear finished") { store.clearFinished() }
+            Button("Clear finished") { pendingConfirmation = store.request(.clearFinished(in: store.jobs)) }
                 .buttonStyle(.themedSecondary)
                 .disabled(!store.jobs.contains { $0.state.isFinished })
+                .queueConfirmation($pendingConfirmation, store: store)
         }
     }
 

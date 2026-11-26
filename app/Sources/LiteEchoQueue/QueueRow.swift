@@ -7,6 +7,10 @@ struct QueueRow: View {
     let job: Job
     let store: QueueStore
     @StateVar private var renamingTranscript: URL?
+    @StateVar private var pendingConfirmation: PendingConfirmation?
+    @StateVar private var hovering = false
+    @FocusState private var rowFocused: Bool
+    @FocusState private var removeFocused: Bool
     @Environment(\.theme) private var theme
 
     private var subtitle: String {
@@ -41,6 +45,15 @@ struct QueueRow: View {
         }
         .padding(.horizontal, 18).padding(.vertical, 16)
         .background(isRunning ? theme.soft : Color.clear)
+        .onHover { hovering = $0 }
+        .focusable(QueueFormat.offersRemoveButton(for: job.state))
+        .focusEffectDisabled()
+        .focused($rowFocused)
+        .onKeyPress(.delete) {
+            guard QueueFormat.offersRemoveButton(for: job.state) else { return .ignored }
+            pendingConfirmation = store.request(.remove(job))
+            return .handled
+        }
         .accessibilityElement(children: .contain)
         .contextMenu {
             if case .done(let output, _) = job.state {
@@ -49,6 +62,7 @@ struct QueueRow: View {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([output]) }
             }
         }
+        .queueConfirmation($pendingConfirmation, store: store)
         .sheet(isPresented: Binding(get: { renamingTranscript != nil },
                                     set: { if !$0 { renamingTranscript = nil } })) {
             if let url = renamingTranscript {
@@ -88,11 +102,12 @@ struct QueueRow: View {
                 .buttonStyle(.themedPrimary)
             Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([output]) }
                 .buttonStyle(.themedSecondary)
+            removeFromListButton
         case .running:
-            Button("Cancel") { store.cancel(job.id) }
+            Button("Cancel") { pendingConfirmation = store.request(.stop(job)) }
                 .buttonStyle(.themedSecondary)
         case .waiting:
-            Button("Remove") { store.remove(job.id) }
+            Button("Remove") { pendingConfirmation = store.request(.remove(job)) }
                 .buttonStyle(.themedSecondary)
                 .accessibilityLabel("Remove \(job.audio.lastPathComponent) from the queue")
         case .failed:
@@ -100,14 +115,30 @@ struct QueueRow: View {
                 .buttonStyle(.themedSecondary)
             Button("Retry") { store.retry(job.id) }
                 .buttonStyle(.themedSecondary)
-            Button("Remove") { store.remove(job.id) }
-                .buttonStyle(.themedSecondary)
+            removeFromListButton
         case .cancelled:
             Button("Retry") { store.retry(job.id) }
                 .buttonStyle(.themedSecondary)
-            Button("Remove") { store.remove(job.id) }
-                .buttonStyle(.themedSecondary)
+            removeFromListButton
         }
+    }
+
+    /// Small circular ✕ for finished rows. Faded out (not removed) until hover/focus so layout is stable
+    /// and it stays in the accessibility tree and Tab order.
+    private var removeFromListButton: some View {
+        let visible = hovering || rowFocused || removeFocused
+        return Button { pendingConfirmation = store.request(.remove(job)) } label: {
+            Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                .foregroundStyle(theme.secondaryText)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(theme.control))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .focused($removeFocused)
+        .opacity(visible ? 1 : 0)
+        .help("Remove from the list")
+        .accessibilityLabel("Remove “\(job.audio.lastPathComponent)” from the list")
     }
 }
 

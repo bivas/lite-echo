@@ -171,3 +171,105 @@ import LiteEchoCore
         #expect(QueueFormat.languagePart(for: job, languages: languages) == "Turkish")
     }
 }
+
+@MainActor @Suite struct DestructiveConfirmationTests {
+    private func job(_ name: String, _ state: JobState) -> Job {
+        var j = Job(audio: URL(fileURLWithPath: "/tmp/\(name)"), options: JobOptions(language: .auto, speakers: .auto, outputFolder: nil))
+        j.state = state
+        return j
+    }
+
+    @Test func texts() {
+        let id = UUID()
+        let stop = PendingConfirmation.stop(id: id, name: "a.m4a")
+        #expect(stop.title == "Stop transcribing “a.m4a”?")
+        #expect(stop.message == "The progress so far is lost. The audio file is not touched.")
+        #expect(stop.confirmLabel == "Stop Transcribing" && stop.cancelLabel == "Keep Going")
+        let rm = PendingConfirmation.remove(id: id, name: "a.m4a", finished: false)
+        #expect(rm.title == "Remove “a.m4a” from the queue?")
+        #expect(rm.message == "It hasn't been transcribed yet. The audio file stays where it is.")
+        #expect(rm.confirmLabel == "Remove" && rm.cancelLabel == "Cancel")
+        #expect(PendingConfirmation.remove(id: id, name: "a.m4a", finished: true).title == "Remove “a.m4a” from the list?")
+    }
+
+    @Test func doneRowRemoveConfirmation() {
+        let done = job("a.m4a", .done(output: URL(fileURLWithPath: "/tmp/a.html"), sampled: []))
+        let p = PendingConfirmation.remove(done)
+        #expect(p.title == "Remove “a.m4a” from the list?")
+        #expect(p.message == "The transcript and the audio file stay on disk. Only the list entry goes.")
+        #expect(p.confirmLabel == "Remove" && p.cancelLabel == "Cancel")
+        // Failed rows keep the generic finished wording.
+        #expect(PendingConfirmation.remove(job("b.m4a", .failed(message: "x"))).message
+                == "Transcripts and audio files are kept on disk; only the list entry is removed.")
+    }
+
+    @Test func removeButtonOnlyForFinishedStates() {
+        let out = URL(fileURLWithPath: "/tmp/a.html")
+        #expect(QueueFormat.offersRemoveButton(for: .done(output: out, sampled: [])))
+        #expect(QueueFormat.offersRemoveButton(for: .failed(message: "x")))
+        #expect(QueueFormat.offersRemoveButton(for: .cancelled))
+        #expect(!QueueFormat.offersRemoveButton(for: .waiting))
+        #expect(!QueueFormat.offersRemoveButton(for: .running(stage: .convert, progress: 0, detail: nil)))
+    }
+
+    @Test func removingDoneJobKeepsFilesOnDisk() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let audio = try f.audio("keep.m4a")
+        f.store.add([audio])
+        #expect(await waitUntil { f.store.isDone("keep.m4a") })
+        let j = try #require(f.store.job(named: "keep.m4a"))
+        guard case .done(let output, _) = j.state else { Issue.record("not done"); return }
+        try Data("t".utf8).write(to: output)
+        f.store.perform(try #require(f.store.request(.remove(j))))
+        #expect(f.store.jobs.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: output.path))
+        #expect(FileManager.default.fileExists(atPath: audio.path))
+    }
+
+    @Test func clearFinishedPluralAndKinds() {
+        #expect(PendingConfirmation.clearFinished(done: 1, failed: 0, cancelled: 0).title == "Clear 1 finished item from the list?")
+        #expect(PendingConfirmation.clearFinished(done: 3, failed: 0, cancelled: 0).title == "Clear 3 finished items from the list?")
+        #expect(PendingConfirmation.clearFinished(done: 1, failed: 1, cancelled: 0).title
+                == "Clear 2 finished, failed or cancelled items from the list?")
+        #expect(PendingConfirmation.clearFinished(done: 0, failed: 0, cancelled: 1).title
+                == "Clear 1 finished, failed or cancelled item from the list?")
+        let p = PendingConfirmation.clearFinished(done: 1, failed: 0, cancelled: 0)
+        #expect(p.message == "Transcripts and audio files are kept on disk; only the list entries are removed.")
+        #expect(p.confirmLabel == "Clear" && p.cancelLabel == "Cancel")
+        let jobs = [job("a", .done(output: URL(fileURLWithPath: "/tmp/a.txt"), sampled: [])), job("b", .failed(message: "x")),
+                    job("c", .cancelled), job("d", .waiting)]
+        #expect(PendingConfirmation.clearFinished(in: jobs) == .clearFinished(done: 1, failed: 1, cancelled: 1))
+    }
+
+    @Test func suppressionFlagsAreRespected() throws {
+        let f = try Fixture(paused: true)
+        let s = f.model.settings
+        let p1 = PendingConfirmation.stop(id: UUID(), name: "x")
+        let p2 = PendingConfirmation.remove(id: UUID(), name: "x", finished: false)
+        let p3 = PendingConfirmation.clearFinished(done: 1, failed: 0, cancelled: 0)
+        #expect([p1, p2, p3].allSatisfy { $0.isEnabled(in: s) })
+        p2.setEnabled(false, in: s)
+        #expect(p1.isEnabled(in: s) && !p2.isEnabled(in: s) && p3.isEnabled(in: s))
+        #expect(!s.askBeforeDestructive)
+        s.askBeforeDestructive = true
+        #expect([p1, p2, p3].allSatisfy { $0.isEnabled(in: s) })
+    }
+
+    @Test func requestDefersUntilConfirmedAndSkipsWhenSuppressed() throws {
+        let f = try Fixture(paused: true)
+        let audio = f.audioDir.appendingPathComponent("w.m4a")
+        FileManager.default.createFile(atPath: audio.path, contents: Data())
+        f.store.add([audio])
+        let id = try #require(f.store.jobs.first?.id)
+        let pending = try #require(f.store.request(.remove(f.store.jobs[0])))
+        #expect(f.store.jobs.count == 1)          // dialog dismissed with the safe button: untouched
+        f.store.perform(pending)
+        #expect(f.store.jobs.isEmpty)
+
+        f.store.add([audio])
+        f.model.settings.confirmRemove = false
+        #expect(f.store.request(.remove(f.store.jobs[0])) == nil)
+        #expect(f.store.jobs.allSatisfy { $0.id != id } && f.store.jobs.isEmpty)
+    }
+}

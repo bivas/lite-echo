@@ -23,21 +23,25 @@ pyannote community-1 for speakers, and runs entirely on your Mac.
 
 ![First run: setting up the models](docs/screenshots/setup-models.png)
 
-The screenshots are rendered off-screen from the real SwiftUI views with sample data
-(`scripts/screenshots.sh`).
-
 ## Requirements
 
 - macOS 14+ on Apple Silicon (arm64)
 - About 1.6 GB of models: Whisper large-v3-turbo, and pyannote community-1 for speakers
-- To build: the Xcode Command Line Tools and [uv](https://docs.astral.sh/uv/)
 
-## macOS app
+## Install
 
-```bash
-scripts/build-app.sh          # → build/LiteEcho.app (add --debug for a faster build)
-scripts/test-app.sh           # Swift tests
-```
+1. Download `LiteEcho-<version>.dmg` from the latest [release](../../releases).
+2. Open it and drag **LiteEcho** onto **Applications**.
+3. Open LiteEcho. If the build isn't notarized, macOS blocks the first open:
+   - On macOS 15 and later, go to System Settings › Privacy & Security and click **Open Anyway**
+     next to "LiteEcho was blocked".
+   - On macOS 14, right-click the app and choose **Open**.
+   - Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/LiteEcho.app`
+4. First-run setup installs the engine and sets up the two models.
+
+Each release also has a `.zip` of the app and a `.sha256` checksum for each download.
+
+## Using the app
 
 **First launch:** the app asks before installing its engine (about 1 GB, once) into
 `~/Library/Application Support/LiteEcho/engine`. It builds the engine from the pinned requirements and
@@ -61,15 +65,6 @@ the wheel bundled in the app. Then, for each model, you choose:
   - Model locations
   - The Hugging Face token, kept in the Keychain
   - The command-line tool, with a check of whether `liteecho` is on your PATH
-
-The app icon is drawn by `scripts/make-icon.swift`:
-
-```bash
-swift scripts/make-icon.swift /tmp/AppIcon.iconset && iconutil -c icns /tmp/AppIcon.iconset -o app/Assets/AppIcon.icns
-```
-
-Without Xcode, SwiftUI's `@State` and `@Entry` macros don't compile. Use `@StateVar`
-(`LiteEchoShared/Compat.swift`) and classic `EnvironmentKey`s.
 
 ## Command-line tool
 
@@ -136,28 +131,9 @@ Policy blocks all scripts and external loads. Metadata sits in `liteecho:*` meta
 of speech is a `<section class="turn" data-speaker="S1">`. Right-to-left languages, dark mode and
 printing are supported. The full contract is in [docs/transcript-format.md](docs/transcript-format.md).
 
-## Tests
+## Development
 
-```bash
-uv run pytest                  # unit tests
-uv run pytest -m integration   # end-to-end regression on a real recording
-```
-
-The regression test transcribes `$LITEECHO_REFERENCE_DIR/<stem>.m4a` and compares the speaker turns
-and text with an expected transcript in `$LITEECHO_EXPECTED_DIR`. By default that is `tests/.expected/`,
-which is git-ignored. To create the expected file once, run the test with `LITEECHO_UPDATE_EXPECTED=1`.
-
-When whisper is unsure about a passage, it falls back to random sampling at higher temperatures. That
-text can differ between runs, and a seed doesn't help, because ctranslate2 samples on its own threads.
-So the test ignores everything from the first sampled segment onwards, which the CLI reports through
-the hidden `--sampled-report` flag. The test fails if that would hide more than 5% of the turns.
-
-**Pinned versions:**
-
-- faster-whisper 1.2.1, ctranslate2 4.8.2, pyannote.audio 4.0.7 and torch 2.13.0
-- `av==18.1.0`: newer PyAV decodes AAC to slightly different samples, which changes output in
-  near-silence. Note that PyPI lists 18.1.0 as yanked over a decoding bug with custom channel layouts.
-- Whisper runs with float weights (`compute_type="float32"`) and 3 CPU threads.
+To build from source, run the tests or make a release, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 

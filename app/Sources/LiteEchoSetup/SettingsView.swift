@@ -77,6 +77,10 @@ struct GeneralSettingsTab: View {
                 Toggle("Show LiteEcho in the menu bar", isOn: $settings.showMenuBarItem)
             }
 
+            Section("Queue") {
+                Toggle("Ask before stopping or removing items", isOn: $settings.askBeforeDestructive)
+            }
+
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)

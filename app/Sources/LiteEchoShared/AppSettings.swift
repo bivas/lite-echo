@@ -33,6 +33,19 @@ public final class AppSettings {
     /// Show the LiteEcho status item in the menu bar (progress and finished files).
     public var showMenuBarItem: Bool { didSet { defaults.set(showMenuBarItem, forKey: Keys.showMenuBarItem) } }
 
+    /// Ask before stopping the running job / removing a queued or finished row / clearing finished rows.
+    public var confirmCancel: Bool { didSet { defaults.set(confirmCancel, forKey: Keys.confirmCancel) } }
+    public var confirmRemove: Bool { didSet { defaults.set(confirmRemove, forKey: Keys.confirmRemove) } }
+    public var confirmClearFinished: Bool {
+        didSet { defaults.set(confirmClearFinished, forKey: Keys.confirmClearFinished) }
+    }
+
+    /// One switch for the three confirmations above: on only when all are on; setting it sets all three.
+    public var askBeforeDestructive: Bool {
+        get { confirmCancel && confirmRemove && confirmClearFinished }
+        set { confirmCancel = newValue; confirmRemove = newValue; confirmClearFinished = newValue }
+    }
+
     /// The speech model's own folder when kept outside LiteEcho's folder (nil = LiteEcho's folder).
     public var whisperModelDir: URL? { didSet { defaults.set(whisperModelDir?.path, forKey: Keys.whisperDir) } }
     /// Same for the speaker detection model.
@@ -65,6 +78,9 @@ public final class AppSettings {
         showPauses = defaults.object(forKey: Keys.showPauses) as? Bool ?? true
         highlightUncertain = defaults.object(forKey: Keys.highlightUncertain) as? Bool ?? false
         showMenuBarItem = defaults.object(forKey: Keys.showMenuBarItem) as? Bool ?? true
+        confirmCancel = defaults.object(forKey: Keys.confirmCancel) as? Bool ?? true
+        confirmRemove = defaults.object(forKey: Keys.confirmRemove) as? Bool ?? true
+        confirmClearFinished = defaults.object(forKey: Keys.confirmClearFinished) as? Bool ?? true
         whisperModelDir = defaults.string(forKey: Keys.whisperDir).map { URL(fileURLWithPath: $0, isDirectory: true) }
         pyannoteModelDir = defaults.string(forKey: Keys.pyannoteDir).map { URL(fileURLWithPath: $0, isDirectory: true) }
         theme = Theme(rawValue: defaults.string(forKey: Keys.theme) ?? "") ?? .default
@@ -124,6 +140,9 @@ public final class AppSettings {
         static let showPauses = "showPauses"
         static let highlightUncertain = "highlightUncertain"
         static let showMenuBarItem = "showMenuBarItem"
+        static let confirmCancel = "confirmCancel"
+        static let confirmRemove = "confirmRemove"
+        static let confirmClearFinished = "confirmClearFinished"
         static let theme = "theme"
         static let whisperDir = "whisperModelDir"
         static let pyannoteDir = "pyannoteModelDir"

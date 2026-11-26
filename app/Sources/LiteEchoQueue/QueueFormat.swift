@@ -1,5 +1,6 @@
 import Foundation
 import LiteEchoCore
+import LiteEchoShared
 
 /// Pure formatting helpers for the queue UI (kept free of UI so they are unit-testable).
 public enum QueueFormat {
@@ -206,5 +207,114 @@ public enum QueueFormat {
             Column(title: "Finding speakers", status: speakers, detail: nil),
             Column(title: "Transcribing", status: transcribe, detail: stage == .transcribe ? detail : nil),
         ]
+    }
+}
+
+extension QueueFormat {
+    /// Whether a row in this state gets the small ✕ (remove from list) button.
+    static func offersRemoveButton(for state: JobState) -> Bool { state.isFinished }
+}
+
+/// A destructive queue action waiting for the user's answer. Pure value: text and policy are testable.
+public enum PendingConfirmation: Equatable, Sendable {
+    /// Stop the running job.
+    case stop(id: UUID, name: String)
+    /// Remove a row; `finished` is true for failed/cancelled rows (never transcribed or already over).
+    /// `transcribed` is true for a done row (its transcript exists on disk).
+    case remove(id: UUID, name: String, finished: Bool, transcribed: Bool = false)
+    /// Remove all finished rows.
+    case clearFinished(done: Int, failed: Int, cancelled: Int)
+
+    public static func stop(_ job: Job) -> Self { .stop(id: job.id, name: job.audio.lastPathComponent) }
+
+    public static func remove(_ job: Job) -> Self {
+        var transcribed = false
+        if case .done = job.state { transcribed = true }
+        return .remove(id: job.id, name: job.audio.lastPathComponent, finished: job.state.isFinished,
+                       transcribed: transcribed)
+    }
+
+    public static func clearFinished(in jobs: [Job]) -> Self {
+        func count(_ match: (JobState) -> Bool) -> Int { jobs.filter { match($0.state) }.count }
+        return .clearFinished(
+            done: count { if case .done = $0 { true } else { false } },
+            failed: count { if case .failed = $0 { true } else { false } },
+            cancelled: count { if case .cancelled = $0 { true } else { false } })
+    }
+
+    public var title: String {
+        switch self {
+        case .stop(_, let name): return "Stop transcribing “\(name)”?"
+        case .remove(_, let name, let finished, _):
+            return finished ? "Remove “\(name)” from the list?" : "Remove “\(name)” from the queue?"
+        case .clearFinished(let done, let failed, let cancelled):
+            let n = done + failed + cancelled
+            let noun = n == 1 ? "item" : "items"
+            let kind = (failed + cancelled == 0) ? "finished" : "finished, failed or cancelled"
+            return "Clear \(n) \(kind) \(noun) from the list?"
+        }
+    }
+
+    public var message: String {
+        switch self {
+        case .stop: "The progress so far is lost. The audio file is not touched."
+        case .remove(_, _, _, true):
+            "The transcript and the audio file stay on disk. Only the list entry goes."
+        case .remove(_, _, let finished, _):
+            finished ? "Transcripts and audio files are kept on disk; only the list entry is removed."
+                     : "It hasn't been transcribed yet. The audio file stays where it is."
+        case .clearFinished: "Transcripts and audio files are kept on disk; only the list entries are removed."
+        }
+    }
+
+    public var confirmLabel: String {
+        switch self {
+        case .stop: "Stop Transcribing"
+        case .remove: "Remove"
+        case .clearFinished: "Clear"
+        }
+    }
+
+    /// The safe button (Return and Esc).
+    public var cancelLabel: String {
+        if case .stop = self { return "Keep Going" }
+        return "Cancel"
+    }
+
+    /// Whether the user's settings ask for this confirmation.
+    @MainActor public func isEnabled(in settings: AppSettings) -> Bool {
+        switch self {
+        case .stop: settings.confirmCancel
+        case .remove: settings.confirmRemove
+        case .clearFinished: settings.confirmClearFinished
+        }
+    }
+
+    /// Turns the "ask" preference for this kind on or off (the dialog's "Don't ask again" checkbox).
+    @MainActor public func setEnabled(_ on: Bool, in settings: AppSettings) {
+        switch self {
+        case .stop: settings.confirmCancel = on
+        case .remove: settings.confirmRemove = on
+        case .clearFinished: settings.confirmClearFinished = on
+        }
+    }
+}
+
+extension QueueStore {
+    /// Runs the action now.
+    public func perform(_ pending: PendingConfirmation) {
+        switch pending {
+        case .stop(let id, _): cancel(id)
+        case .remove(let id, _, _, _): remove(id)
+        case .clearFinished: clearFinished()
+        }
+    }
+
+    /// Entry point for UI: performs immediately when the user turned the confirmation off,
+    /// otherwise returns the request to show. Nothing changes until `perform` is called.
+    public func request(_ pending: PendingConfirmation) -> PendingConfirmation? {
+        if pending.isEnabled(in: model.settings) { return pending }
+        perform(pending)
+        return nil
     }
 }

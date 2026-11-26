@@ -3,6 +3,13 @@
 #
 #   scripts/build-app.sh            release build
 #   scripts/build-app.sh --debug    debug build (faster)
+#   LITEECHO_VERSION=1.2.3 scripts/build-app.sh    stamp a version (also: --version 1.2.3);
+#                                   defaults to the version in pyproject.toml
+#
+# Signing: ad-hoc by default. If MACOS_SIGN_IDENTITY is set (a Developer ID Application
+# identity already present in the keychain), the app is signed with it using the hardened
+# runtime and a secure timestamp, which is what notarization requires. Importing the
+# certificate is the caller's job (see .github/workflows/release.yml).
 #
 # The app bundles the engine *ingredients*, not the engine: the uv binary, the pinned
 # requirements exported from uv.lock, and the liteecho wheel. First-run setup builds the
@@ -11,13 +18,25 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG=release
-[[ "${1:-}" == "--debug" ]] && CONFIG=debug
+APP_VERSION="${LITEECHO_VERSION:-}"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --debug) CONFIG=debug ;;
+        --version) APP_VERSION="${2:?--version needs a value}"; shift ;;
+        --version=*) APP_VERSION="${1#--version=}" ;;
+        *) echo "unknown argument: $1" >&2; exit 2 ;;
+    esac
+    shift
+done
 
 BUILD="$ROOT/build"
 APP="$BUILD/LiteEcho.app"
 CONTENTS="$APP/Contents"
 ENGINE="$CONTENTS/Resources/engine"
-VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/pyproject.toml" | head -1)"
+VERSION="${APP_VERSION#v}"
+[[ -n "$VERSION" ]] || VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/pyproject.toml" | head -1)"
+[[ -n "$VERSION" ]] || { echo "could not determine version" >&2; exit 1; }
+echo "==> Version $VERSION"
 
 echo "==> Swift build ($CONFIG)"
 swift build --package-path "$ROOT/app" -c "$CONFIG"
@@ -58,7 +77,7 @@ cat > "$CONTENTS/Info.plist" <<PLIST
     <key>CFBundleExecutable</key><string>LiteEcho</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleVersion</key><string>$VERSION</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
@@ -77,8 +96,18 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 </plist>
 PLIST
 
-echo "==> Ad-hoc signing"
-codesign --force --sign - "$ENGINE/uv"
-codesign --force --sign - "$APP"
+if [[ -n "${MACOS_SIGN_IDENTITY:-}" ]]; then
+    echo "==> Developer ID signing ($MACOS_SIGN_IDENTITY, hardened runtime)"
+    # Inside-out: the bundled uv first, then the app. No entitlements are needed: the app
+    # only spawns child processes (uv, Python), which are not bound by the app's runtime.
+    SIGN=(codesign --force --sign "$MACOS_SIGN_IDENTITY" --options runtime --timestamp)
+    "${SIGN[@]}" "$ENGINE/uv"
+    "${SIGN[@]}" "$APP"
+else
+    echo "==> Ad-hoc signing"
+    codesign --force --sign - "$ENGINE/uv"
+    codesign --force --sign - "$APP"
+fi
+codesign --verify --deep --strict "$APP"
 
-echo "Built $APP ($(du -sh "$APP" | cut -f1))"
+echo "Built $APP $VERSION ($(du -sh "$APP" | cut -f1))"

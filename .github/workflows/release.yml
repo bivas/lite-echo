@@ -1,0 +1,133 @@
+name: Release
+
+# Push a tag like v0.3.0 (must match pyproject.toml) to build a DRAFT GitHub Release with
+# LiteEcho-<version>.dmg, .zip and .sha256 files. Review the draft, then publish it.
+#
+# Optional secrets (without them the build is ad-hoc signed and not notarized):
+#   MACOS_CERT_P12_BASE64, MACOS_CERT_PASSWORD, MACOS_SIGN_IDENTITY   Developer ID signing
+#   APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD                       notarization
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, e.g. 0.3.0 (must match pyproject.toml)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      HAS_SIGNING: ${{ secrets.MACOS_CERT_P12_BASE64 != '' && secrets.MACOS_CERT_PASSWORD != '' && secrets.MACOS_SIGN_IDENTITY != '' }}
+      HAS_NOTARY: ${{ secrets.APPLE_ID != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPLE_APP_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        run: |
+          RAW="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${RAW#v}"
+          PYV="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
+          if [[ "$VERSION" != "$PYV" ]]; then
+            echo "::error::Version $VERSION does not match pyproject.toml ($PYV); the bundled wheel would disagree with the app version."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Import signing certificate
+        if: env.HAS_SIGNING == 'true'
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/release.keychain-db"
+          KCPASS="$(uuidgen)"
+          echo "$MACOS_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KCPASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KCPASS" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KCPASS" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Build app
+        env:
+          LITEECHO_VERSION: ${{ steps.v.outputs.version }}
+          MACOS_SIGN_IDENTITY: ${{ env.HAS_SIGNING == 'true' && secrets.MACOS_SIGN_IDENTITY || '' }}
+        run: scripts/build-app.sh
+
+      - name: Notarize and staple app
+        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          ditto -c -k --keepParent build/LiteEcho.app "$RUNNER_TEMP/notarize-app.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize-app.zip" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple build/LiteEcho.app
+
+      - name: Package DMG and zip
+        env:
+          LITEECHO_VERSION: ${{ steps.v.outputs.version }}
+        run: scripts/make-dmg.sh
+
+      - name: Sign, notarize and staple DMG
+        if: env.HAS_SIGNING == 'true'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          DMG="build/LiteEcho-$VERSION.dmg"
+          codesign --force --sign "$MACOS_SIGN_IDENTITY" --timestamp "$DMG"
+          if [[ "$HAS_NOTARY" == "true" ]]; then
+            xcrun notarytool submit "$DMG" \
+              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+            xcrun stapler staple "$DMG"
+          fi
+          # Signing/stapling changed the DMG; refresh its checksum.
+          (cd build && shasum -a 256 "LiteEcho-$VERSION.dmg" > "LiteEcho-$VERSION.dmg.sha256")
+
+      - name: Gatekeeper check (informational)
+        continue-on-error: true
+        run: |
+          spctl --assess --type execute --verbose=4 build/LiteEcho.app || true
+          codesign -dv --verbose=2 build/LiteEcho.app 2>&1 | head -20
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.v.outputs.version }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          NOTE=""
+          if [[ "$HAS_SIGNING" != "true" || "$HAS_NOTARY" != "true" ]]; then
+            NOTE=$'**Unsigned build.** macOS will warn on first launch. Right-click LiteEcho.app, choose Open, then Open again; or allow it in System Settings > Privacy & Security > Open Anyway.\n'
+          fi
+          # A manual run on a branch needs a target for the new tag.
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --draft --generate-notes \
+            --title "LiteEcho $VERSION" \
+            --notes "$NOTE" \
+            "build/LiteEcho-$VERSION.dmg" "build/LiteEcho-$VERSION.dmg.sha256" \
+            "build/LiteEcho-$VERSION.zip" "build/LiteEcho-$VERSION.zip.sha256"
