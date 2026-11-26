@@ -45,7 +45,9 @@ struct LiteEchoApp: App {
         }
 
         // Status item: progress of the running job, recently finished files, quick actions.
-        MenuBarExtra(isInserted: Bindable(model.settings).showMenuBarItem) {
+        // Ignore same-value writes: MenuBarExtra writes this binding back on every update, which
+        // otherwise loops forever through the observed setting (seen in the CI-built release).
+        MenuBarExtra(isInserted: Bindable(model.settings).showMenuBarItem.ignoringRepeatedValues()) {
             MenuBarContent(store: queue)
                 .environment(model)
                 .environment(model.settings)

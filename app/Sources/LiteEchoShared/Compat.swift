@@ -15,3 +15,18 @@ public enum WindowID {
     /// The main queue window (`Window`).
     public static let main = "main"
 }
+
+public extension Binding where Value: Equatable {
+    /// A binding that ignores writes of the value it already holds.
+    ///
+    /// Some SwiftUI scenes write their binding back on every update: `MenuBarExtra(isInserted:)`
+    /// does when the app is built against the macOS 15 SDK. With an `@Observable` source each
+    /// write counts as a change, even for the same value, so the scene body runs again, the
+    /// binding is written again, and the app spins at 100% CPU without ever drawing a window.
+    func ignoringRepeatedValues() -> Binding<Value> {
+        Binding(get: { wrappedValue }, set: { newValue, transaction in
+            guard newValue != wrappedValue else { return }
+            self.transaction(transaction).wrappedValue = newValue
+        })
+    }
+}
