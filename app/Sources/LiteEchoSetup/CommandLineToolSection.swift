@@ -156,26 +156,32 @@ enum ProcessRunner {
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice
-        let done = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in done.signal() }
         do { try process.run() } catch { return nil }
+
+        // Read on a dedicated thread, not a GCD worker: when many callers block at once (tests run
+        // in parallel on a small CI runner) the GCD pool can be exhausted and the read never starts.
         let box = Box()
         let reader = DispatchSemaphore(value: 0)
-        DispatchQueue.global().async {
+        let thread = Thread {
             let d = pipe.fileHandleForReading.readDataToEndOfFile()
             box.lock.lock(); box.data = d; box.lock.unlock()
             reader.signal()
         }
-        // One deadline for both the process and reading its output. Reading can finish after the
-        // process exits on a busy machine, so never return early with whatever has arrived so far.
-        let deadline = DispatchTime.now() + timeout
-        if done.wait(timeout: deadline) == .timedOut {
-            process.terminate()
-            _ = done.wait(timeout: .now() + 1)
-            return nil
+        thread.start()
+
+        // One deadline for the process and its output. Poll for exit instead of relying on
+        // terminationHandler, which is also delivered on a shared queue.
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning {
+            if Date() >= deadline {
+                process.terminate()
+                return nil
+            }
+            Thread.sleep(forTimeInterval: 0.01)
         }
-        // A child that outlives the shell can hold the pipe open; give up at the deadline then.
-        guard reader.wait(timeout: deadline) == .success else { return nil }
+        // A child that outlives the program can hold the pipe open; give up at the deadline then.
+        let remaining = max(0, deadline.timeIntervalSinceNow)
+        guard reader.wait(timeout: .now() + remaining) == .success else { return nil }
         guard process.terminationStatus == 0 else { return nil }
         box.lock.lock(); defer { box.lock.unlock() }
         return String(data: box.data, encoding: .utf8)
