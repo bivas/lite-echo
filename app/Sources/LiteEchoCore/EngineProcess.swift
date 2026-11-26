@@ -50,43 +50,35 @@ public final class EngineProcess: @unchecked Sendable {
     public func run(onEvent: @escaping @Sendable (EngineEvent) -> Void) async throws -> Result {
         let exitCode = try await ChildProcess.run(process, stdout: { [weak self] chunk in
             guard let self else { return }
-            self.lock.lock()
-            let lines = self.lineBuffer.append(chunk)
-            self.lock.unlock()
+            let lines = self.lock.withLock { self.lineBuffer.append(chunk) }
             for line in lines {
                 if let event = EngineEvent.parse(line: line) { onEvent(event) }
             }
         }, stderr: { [weak self] chunk in
             guard let self else { return }
-            self.lock.lock()
-            self.stderrData.append(chunk)
-            if self.stderrData.count > 65_536 {
-                self.stderrData.removeFirst(self.stderrData.count - 65_536)
+            self.lock.withLock {
+                self.stderrData.append(chunk)
+                if self.stderrData.count > 65_536 {
+                    self.stderrData.removeFirst(self.stderrData.count - 65_536)
+                }
             }
-            self.lock.unlock()
         }, afterLaunch: { [weak self] in
             // A cancel() that arrived before launch must still stop the process.
             guard let self else { return }
-            self.lock.lock()
-            let cancelledEarly = self.wasCancelled
-            self.lock.unlock()
+            let cancelledEarly = self.lock.withLock { self.wasCancelled }
             if cancelledEarly { self.process.terminate() }
         })
 
-        lock.lock()
-        let last = lineBuffer.flush()
-        let tail = String(decoding: stderrData.suffix(65_536), as: UTF8.self)
-        let cancelled = wasCancelled
-        lock.unlock()
+        let (last, tail, cancelled) = lock.withLock {
+            (lineBuffer.flush(), String(decoding: stderrData.suffix(65_536), as: UTF8.self), wasCancelled)
+        }
         if let last, let event = EngineEvent.parse(line: last) { onEvent(event) }
         return Result(exitCode: exitCode, cancelled: cancelled, stderrTail: tail)
     }
 
     /// Asks the engine to stop (SIGTERM). Safe to call more than once or before exit.
     public func cancel() {
-        lock.lock()
-        wasCancelled = true
-        lock.unlock()
+        lock.withLock { wasCancelled = true }
         if process.isRunning { process.terminate() }
     }
 

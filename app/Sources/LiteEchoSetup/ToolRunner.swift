@@ -25,20 +25,21 @@ final class ToolProcess: @unchecked Sendable {
     }
 
     private func consume(_ chunk: Data, flush: Bool = false) {
-        lock.lock()
-        tail.append(chunk)
-        if tail.count > 65_536 { tail.removeFirst(tail.count - 65_536) }
-        pending.append(chunk)
-        var lines: [String] = []
-        while let idx = pending.firstIndex(where: { $0 == 0x0A || $0 == 0x0D }) {
-            lines.append(String(decoding: pending[pending.startIndex..<idx], as: UTF8.self))
-            pending.removeSubrange(pending.startIndex...idx)
+        let lines: [String] = lock.withLock {
+            tail.append(chunk)
+            if tail.count > 65_536 { tail.removeFirst(tail.count - 65_536) }
+            pending.append(chunk)
+            var lines: [String] = []
+            while let idx = pending.firstIndex(where: { $0 == 0x0A || $0 == 0x0D }) {
+                lines.append(String(decoding: pending[pending.startIndex..<idx], as: UTF8.self))
+                pending.removeSubrange(pending.startIndex...idx)
+            }
+            if flush, !pending.isEmpty {
+                lines.append(String(decoding: pending, as: UTF8.self))
+                pending.removeAll()
+            }
+            return lines
         }
-        if flush, !pending.isEmpty {
-            lines.append(String(decoding: pending, as: UTF8.self))
-            pending.removeAll()
-        }
-        lock.unlock()
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if !trimmed.isEmpty { onLine(trimmed) }
@@ -46,15 +47,11 @@ final class ToolProcess: @unchecked Sendable {
     }
 
     private var isCancelled: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return cancelled
+        lock.withLock { cancelled }
     }
 
     func cancel() {
-        lock.lock()
-        cancelled = true
-        lock.unlock()
+        lock.withLock { cancelled = true }
         if process.isRunning { process.terminate() }
     }
 
@@ -69,9 +66,9 @@ final class ToolProcess: @unchecked Sendable {
             self.process.terminate()
         })
         consume(Data(), flush: true)
-        lock.lock()
-        let result = Result(exitCode: exitCode, stderrTail: String(decoding: tail, as: UTF8.self))
-        lock.unlock()
+        let result = lock.withLock {
+            Result(exitCode: exitCode, stderrTail: String(decoding: tail, as: UTF8.self))
+        }
         if isCancelled { throw CancellationError() }
         return result
     }
