@@ -323,6 +323,34 @@ let screens: [Screen] = [
             .themed(sample.model.settings)
         return renderPanel(view, width: 320, dark: false)
     },
+    Screen(name: "voice-memos-import") {
+        let sample = try Sample(theme: .professional, models: .bothReady, withQueue: false)
+        defer { sample.cleanup() }
+        let now = Date()
+        func ago(_ days: Double, _ hours: Double = 0) -> Date { now.addingTimeInterval(-(days * 86_400 + hours * 3_600)) }
+        let listing = VoiceMemoListing(status: .ok, folders: [
+            VoiceMemoFolder(id: "f-work", name: "Work"), VoiceMemoFolder(id: "f-study", name: "Study"),
+        ], memos: [
+            VoiceMemo(id: "m1", title: "Customer call", recorded: ago(0, 2), durationSeconds: 1311,
+                      folderID: "f-work", favorite: true, appleTranscript: true, format: "m4a"),
+            VoiceMemo(id: "m2", title: "Team sync", recorded: ago(1, 3), durationSeconds: 2892,
+                      folderID: "f-work", format: "m4a"),
+            VoiceMemo(id: "m3", title: "Idea for the product demo", recorded: ago(3), durationSeconds: 123,
+                      format: "m4a"),
+            VoiceMemo(id: "m4", title: "Lecture notes", recorded: ago(6), durationSeconds: 3870,
+                      folderID: "f-study", local: false, format: "m4a"),
+            VoiceMemo(id: "m5", title: "Interview draft", recorded: ago(8), durationSeconds: 1988,
+                      folderID: "f-work", appleTranscript: true, format: "m4a"),
+            VoiceMemo(id: "m6", title: "New Recording 14", recorded: ago(10), durationSeconds: 41,
+                      format: "qta"),
+        ])
+        let view = VoiceMemoImportView(store: sample.queue, listing: listing, onCancel: {}, onDone: {})
+            .environment(sample.model)
+            .environment(sample.model.settings)
+            .themed(sample.model.settings)
+        return renderWindow(view, size: NSSize(width: 960, height: 640), title: "Import from Voice Memos",
+                            dark: false)
+    },
     Screen(name: "setup-models") {
         let sample = try Sample(theme: .professional, models: .bothMissing, withQueue: false)
         defer { sample.cleanup() }

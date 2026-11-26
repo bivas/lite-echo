@@ -4,11 +4,19 @@ import LiteEchoShared
 import SwiftUI
 
 /// Sheet C: pick recordings from Voice Memos and add them to the queue.
-struct VoiceMemoImportView: View {
+public struct VoiceMemoImportView: View {
     let store: QueueStore
     let listing: VoiceMemoListing
     let onCancel: () -> Void
     let onDone: () -> Void
+
+    public init(store: QueueStore, listing: VoiceMemoListing,
+                onCancel: @escaping () -> Void, onDone: @escaping () -> Void) {
+        self.store = store
+        self.listing = listing
+        self.onCancel = onCancel
+        self.onDone = onDone
+    }
 
     @StateVar private var search = ""
     @StateVar private var folderID: String?
@@ -37,7 +45,7 @@ struct VoiceMemoImportView: View {
         VoiceMemoCatalog.addable(rows, selected: selected, imported: imported, queued: queued)
     }
 
-    var body: some View {
+    public var body: some View {
         VStack(spacing: 0) {
             header
             theme.separator.frame(height: 1)
@@ -129,14 +137,17 @@ struct VoiceMemoImportView: View {
 
     private var columnHeader: some View {
         HStack(spacing: 12) {
-            Color.clear.frame(width: 22)
+            // Fixed-height spacers: a bare Color.clear is vertically flexible and made this row
+            // take about half the sheet.
+            Color.clear.frame(width: 22, height: 1)
             SectionLabel("Title").frame(maxWidth: .infinity, alignment: .leading)
             SectionLabel("Date").frame(width: 130, alignment: .leading)
             SectionLabel("Length").frame(width: 64, alignment: .trailing)
             SectionLabel("Folder").frame(width: 110, alignment: .leading)
-            Color.clear.frame(width: 190)
+            Color.clear.frame(width: 190, height: 1)
         }
         .padding(.horizontal, 20).padding(.vertical, 6)
+        .fixedSize(horizontal: false, vertical: true)
         .background(theme.bar)
     }
 
@@ -164,6 +175,7 @@ struct VoiceMemoImportView: View {
                     }
                 }
             }
+            .frame(maxHeight: .infinity)
         }
     }
 
@@ -239,9 +251,9 @@ struct VoiceMemoImportView: View {
     // MARK: Footer
 
     private var footer: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 10) {
             LanguagePicker("Language", selection: $language, model: store.model, showsChips: false)
-                .frame(width: 190)
+                .frame(width: 170)
             Button { speakersOpen.toggle() } label: {
                 HStack(spacing: 6) {
                     Text("Speakers: \(speakers.label)").lineLimit(1)
@@ -249,6 +261,7 @@ struct VoiceMemoImportView: View {
                 }
             }
             .buttonStyle(.themedSecondary)
+            .fixedSize()
             .accessibilityLabel("Speakers")
             .accessibilityValue(speakers.label)
             .popover(isPresented: $speakersOpen, arrowEdge: .top) {
@@ -260,12 +273,14 @@ struct VoiceMemoImportView: View {
                 Button("Transcripts folder") { outputFolder = nil }
                 Button("Choose…") { chooseFolder() }
             } label: {
-                Text("Save to: \(outputFolder?.lastPathComponent ?? "Transcripts folder")").lineLimit(1)
+                Text("Save to: \(outputFolder?.lastPathComponent ?? "Transcripts folder")")
+                    .lineLimit(1).truncationMode(.middle)
             }
-            .menuStyle(.button).buttonStyle(.themedSecondary).fixedSize()
+            // A long custom folder name truncates here instead of squeezing the other controls.
+            .menuStyle(.button).buttonStyle(.themedSecondary).frame(maxWidth: 230)
             .help(outputFolder?.path ?? EngineCommand.defaultVoiceMemoFolder.path)
             .accessibilityLabel("Save to")
-            Toggle("Show already imported", isOn: $showImported).toggleStyle(.checkbox)
+            Toggle("Show already imported", isOn: $showImported).toggleStyle(.checkbox).fixedSize()
             Spacer()
             Button("Cancel", action: onCancel).buttonStyle(.themedSecondary).keyboardShortcut(.cancelAction)
             Button(addable.isEmpty ? "Add to Queue" : "Add \(addable.count) to Queue") { add() }
