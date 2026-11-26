@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LiteEcho queue</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#E8E8ED;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;color:#1D1D1F;-webkit-font-smoothing:antialiased}
+a{color:#0A64D8}a:hover{color:#084FA8}
+button,select,input{font:inherit}
+</style>
+</helmet>
+<div style="padding: 24px; box-sizing: border-box; min-height: 860px">
+<div style="max-width: 1232px; margin: 0 auto; background: #FFFFFF; border: 1px solid #C9C9CF; border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.14)">
+
+<div style="display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 16px; background: #F6F6F8; border-bottom: 1px solid #DCDCE0">
+<div aria-hidden="true" style="display: flex; gap: 8px">
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FF5F57"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FEBC2E"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #28C840"></span>
+</div>
+<div style="font-weight: 600; font-size: 14px">LiteEcho</div>
+<div style="flex: 1"></div>
+<button type="button" style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; color: #1D1D1F; cursor: pointer">
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+Add Files…
+</button>
+<button type="button" style="height: 30px; padding: 0 14px; border: 0; border-radius: 7px; background: #0A64D8; color: #FFFFFF; font-weight: 600; cursor: pointer">Start</button>
+</div>
+
+<div style="display: flex; flex-wrap: wrap">
+
+<aside style="flex: 1 1 260px; max-width: 300px; box-sizing: border-box; padding: 20px; background: #F2F2F5; border-right: 1px solid #DCDCE0; display: flex; flex-direction: column; gap: 22px">
+<div style="font-size: 12px; font-weight: 600; color: #5E5E66; letter-spacing: 0.04em; text-transform: uppercase">For new files</div>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="font-size: 13px; font-weight: 600; padding: 0; margin-bottom: 8px">Language</legend>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #E3E3E8; border-radius: 8px; padding: 2px">
+<button type="button" aria-pressed="false" style="height: 28px; border: 0; border-radius: 6px; background: transparent; color: #1D1D1F; cursor: pointer">Auto</button>
+<button type="button" aria-pressed="false" style="height: 28px; border: 0; border-radius: 6px; background: transparent; color: #1D1D1F; cursor: pointer">English</button>
+<button type="button" aria-pressed="true" style="height: 28px; border: 0; border-radius: 6px; background: #FFFFFF; color: #1D1D1F; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.15); cursor: pointer">Hebrew</button>
+</div>
+</fieldset>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+<legend style="font-size: 13px; font-weight: 600; padding: 0; margin-bottom: 8px">Speakers</legend>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 13px"><input type="radio" name="spk" checked> Detect automatically</label>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px">
+<input id="spk-fixed" type="radio" name="spk">
+<label for="spk-fixed">Exactly</label>
+<input aria-label="Number of speakers" type="number" min="1" value="2" disabled style="width: 56px; height: 26px; box-sizing: border-box; padding: 0 6px; border: 1px solid #C9C9CF; border-radius: 6px; background: #FFFFFF; color: #6E6E73">
+<span style="color: #5E5E66">speakers</span>
+</div>
+</fieldset>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="out" style="font-size: 13px; font-weight: 600">Save transcript</label>
+<select id="out" style="height: 30px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; padding: 0 8px; color: #1D1D1F">
+<option>Next to the audio file</option>
+<option>In a folder I choose…</option>
+</select>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 10px; background: #FFFFFF; border: 1px solid #DCDCE0">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600">
+<span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; background: #1E7B34"></span>
+Models ready
+</div>
+<div style="font-size: 12px; color: #5E5E66; line-height: 1.45">Whisper large-v3-turbo and pyannote community-1, checked against pinned checksums.</div>
+<a href="Setup.dc.html" style="font-size: 12px">Manage models</a>
+</div>
+
+<div style="font-size: 12px; color: #5E5E66; line-height: 1.45">Overlapping speech, timestamps and pause marks use the standard transcript format.</div>
+</aside>
+
+<main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 150px; border: 2px dashed #B8B8C0; border-radius: 14px; background: #FAFAFC; text-align: center; padding: 20px">
+<svg aria-hidden="true" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#5E5E66" stroke-width="1.6" stroke-linecap="round"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2M21 12h0"></path></svg>
+<div style="font-size: 16px; font-weight: 600">Drop audio or video files here</div>
+<div style="font-size: 13px; color: #5E5E66">m4a, mp3, wav, mp4, mov and anything else FFmpeg reads. Files are processed on this Mac only.</div>
+</div>
+
+<div style="display: flex; align-items: baseline; gap: 10px">
+<h2 style="margin: 0; font-size: 17px">Queue</h2>
+<span style="font-size: 13px; color: #5E5E66">3 files</span>
+<div style="flex: 1"></div>
+<button type="button" style="height: 28px; padding: 0 12px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; color: #1D1D1F; cursor: pointer">Clear finished</button>
+</div>
+
+<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid #DCDCE0; border-radius: 12px; overflow: hidden">
+
+<li style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 16px 18px; border-bottom: 1px solid #E5E5EA">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E7B34" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.6 2.6L16 9.5"></path></svg>
+<div style="flex: 1 1 260px; min-width: 0">
+<div style="font-size: 14px; font-weight: 600">Team sync 2026-11-17.m4a</div>
+<div style="font-size: 12px; color: #5E5E66; margin-top: 2px">48:12 · Hebrew · 2 speakers · finished in 14 min</div>
+</div>
+<a href="Transcript.dc.html" style="display: inline-flex; align-items: center; height: 30px; padding: 0 14px; border-radius: 7px; background: #0A64D8; color: #FFFFFF; font-size: 13px; font-weight: 600; text-decoration: none">Open transcript</a>
+<button type="button" style="height: 30px; padding: 0 12px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; color: #1D1D1F; cursor: pointer">Show in Finder</button>
+</li>
+
+<li style="display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border-bottom: 1px solid #E5E5EA; background: #F7FAFF">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0A64D8" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9" stroke="#C9DAF5"></circle><path d="M12 3a9 9 0 0 1 9 9"></path></svg>
+<div style="flex: 1 1 260px; min-width: 0">
+<div style="font-size: 14px; font-weight: 600">Customer call.m4a</div>
+<div style="font-size: 12px; color: #5E5E66; margin-top: 2px">21:51 · Hebrew · speakers detected automatically</div>
+</div>
+<button type="button" style="height: 30px; padding: 0 12px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; color: #1D1D1F; cursor: pointer">Cancel</button>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-left: 36px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; font-size: 12px"><span style="font-weight: 600">Converting audio</span><span style="color: #1E7B34">Done</span></div>
+<div style="height: 6px; border-radius: 3px; background: #1E7B34"></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; font-size: 12px"><span style="font-weight: 600">Finding speakers</span><span style="color: #1E7B34">Done</span></div>
+<div style="height: 6px; border-radius: 3px; background: #1E7B34"></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; font-size: 12px"><span style="font-weight: 600">Transcribing</span><span style="color: #0A64D8; font-weight: 600">45%</span></div>
+<div style="height: 6px; border-radius: 3px; background: #E3E3E8; overflow: hidden"><div style="width: 45%; height: 6px; background: #0A64D8"></div></div>
+<div style="font-size: 12px; color: #5E5E66">09:50 of 21:51 · about 3 min left</div>
+</div>
+</div>
+</li>
+
+<li style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 16px 18px">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+<div style="flex: 1 1 260px; min-width: 0">
+<div style="font-size: 14px; font-weight: 600">Interview draft.mp3</div>
+<div style="font-size: 12px; color: #5E5E66; margin-top: 2px">1:02:05 · Auto language · 3 speakers · waiting</div>
+</div>
+<button type="button" style="height: 30px; padding: 0 12px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; color: #1D1D1F; cursor: pointer">Remove</button>
+</li>
+</ul>
+
+</main>
+</div>
+
+<div style="display: flex; align-items: center; gap: 12px; height: 32px; padding: 0 16px; border-top: 1px solid #DCDCE0; background: #F6F6F8; font-size: 12px; color: #5E5E66">
+<span>Transcribing 1 of 3</span>
+<div style="flex: 1"></div>
+<span>Runs offline · engine liteecho 0.1</span>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

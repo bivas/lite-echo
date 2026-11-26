@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LiteEcho settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#E8E8ED;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;color:#1D1D1F;-webkit-font-smoothing:antialiased}
+a{color:#0A64D8}a:hover{color:#084FA8}
+button,select,input{font:inherit}
+</style>
+</helmet>
+<div style="padding: 24px; box-sizing: border-box; min-height: 860px">
+<div style="max-width: 760px; margin: 0 auto; background: #FFFFFF; border: 1px solid #C9C9CF; border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.14)">
+
+<div style="display: flex; flex-direction: column; background: #F6F6F8; border-bottom: 1px solid #DCDCE0">
+<div style="display: flex; align-items: center; gap: 16px; height: 40px; padding: 0 16px">
+<div aria-hidden="true" style="display: flex; gap: 8px">
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FF5F57"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FEBC2E"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #28C840"></span>
+</div>
+<div style="flex: 1; text-align: center; font-weight: 600; font-size: 13px; margin-right: 52px">General</div>
+</div>
+<nav aria-label="Settings sections" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 0 16px 10px">
+<button type="button" aria-pressed="true" style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; padding: 6px 0; border: 0; border-radius: 8px; background: #E3E3E8; color: #1D1D1F; font-size: 12px; cursor: pointer">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>
+General
+</button>
+<button type="button" aria-pressed="false" style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; padding: 6px 0; border: 0; border-radius: 8px; background: transparent; color: #1D1D1F; font-size: 12px; cursor: pointer">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"></path></svg>
+Models
+</button>
+<button type="button" aria-pressed="false" style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; padding: 6px 0; border: 0; border-radius: 8px; background: transparent; color: #1D1D1F; font-size: 12px; cursor: pointer">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg>
+Output
+</button>
+<button type="button" aria-pressed="false" style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; padding: 6px 0; border: 0; border-radius: 8px; background: transparent; color: #1D1D1F; font-size: 12px; cursor: pointer">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>
+Advanced
+</button>
+</nav>
+</div>
+
+<div style="padding: 24px 32px 28px; display: flex; flex-direction: column; gap: 22px">
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; align-items: center">
+<label for="dlang" style="font-size: 13px; text-align: right">Default language</label>
+<select id="dlang" style="height: 28px; max-width: 220px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; padding: 0 8px">
+<option>Hebrew</option>
+<option>English</option>
+<option>Detect automatically</option>
+</select>
+
+<label for="dspk" style="font-size: 13px; text-align: right">Default speakers</label>
+<select id="dspk" style="height: 28px; max-width: 220px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; padding: 0 8px">
+<option>Detect automatically</option>
+<option>2</option>
+<option>3</option>
+<option>4 or more…</option>
+</select>
+
+<label for="dout" style="font-size: 13px; text-align: right">Save transcripts</label>
+<select id="dout" style="height: 28px; max-width: 220px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; padding: 0 8px">
+<option>Next to the audio file</option>
+<option>In Documents › Transcripts</option>
+<option>Choose a folder…</option>
+</select>
+</div>
+
+<div style="height: 1px; background: #E5E5EA"></div>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px">
+<legend style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">When a file finishes</legend>
+<div style="font-size: 13px; text-align: right">When a file finishes</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<label style="display: flex; align-items: center; gap: 8px; font-size: 13px"><input type="checkbox" checked> Show a notification</label>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 13px"><input type="checkbox"> Open the transcript</label>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 13px"><input type="checkbox" checked> Keep the Mac awake while the queue runs</label>
+</div>
+</fieldset>
+
+<div style="height: 1px; background: #E5E5EA"></div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; align-items: start">
+<div style="font-size: 13px; text-align: right; padding-top: 2px">Command line</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<button type="button" style="align-self: flex-start; height: 28px; padding: 0 12px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; color: #1D1D1F; cursor: pointer">Install “liteecho” command…</button>
+<div style="font-size: 12px; color: #5E5E66; line-height: 1.45">Adds the same engine to your PATH. The app and the command share one set of models.</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "liteecho"
+version = "0.3.0"
+description = "Local transcription CLI (faster-whisper + pyannote)"
+license = "Apache-2.0"
+requires-python = "==3.12.*"
+dependencies = [
+    # Pinned: transcripts are validated against exactly these versions.
+    "faster-whisper==1.2.1",
+    "ctranslate2==4.8.2",
+    "pyannote.audio==4.0.7",
+    "torch==2.13.0",
+    "torchaudio==2.11.0",
+    "numpy==2.5.3",
+    "av==18.1.0",  # bundles ffmpeg 8.1.2 / libavcodec 62.28.102, 18.1.1 decodes AAC slightly differently
+    "pyyaml",
+    "soundfile",
+]
+
+[project.scripts]
+liteecho = "liteecho.cli:main"
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/liteecho"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: slow end-to-end run on real audio"]

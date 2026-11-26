@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LiteEcho transcript viewer</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#E8E8ED;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;color:#1D1D1F;-webkit-font-smoothing:antialiased}
+a{color:#0A64D8}a:hover{color:#084FA8}
+button,select,input{font:inherit}
+</style>
+</helmet>
+<div style="padding: 24px; box-sizing: border-box; min-height: 860px">
+<div style="max-width: 1232px; margin: 0 auto; background: #FFFFFF; border: 1px solid #C9C9CF; border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.14)">
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 52px; padding: 8px 16px; box-sizing: border-box; background: #F6F6F8; border-bottom: 1px solid #DCDCE0">
+<div aria-hidden="true" style="display: flex; gap: 8px">
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FF5F57"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FEBC2E"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #28C840"></span>
+</div>
+<a href="Main.dc.html" aria-label="Back to queue" style="display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 7px; color: #1D1D1F">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+</a>
+<div style="display: flex; flex-direction: column">
+<div style="font-weight: 600; font-size: 14px">Team sync 2026-11-17</div>
+<div style="font-size: 11px; color: #5E5E66">Hebrew · 48:12 · saved next to the audio file</div>
+</div>
+<div style="flex: 1"></div>
+<label for="find" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search transcript</label>
+<input id="find" type="search" placeholder="Search transcript" style="width: 220px; height: 30px; box-sizing: border-box; padding: 0 10px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF">
+<button type="button" style="height: 30px; padding: 0 12px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; color: #1D1D1F; cursor: pointer">Open in Browser</button>
+<button type="button" style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: #0A64D8; color: #FFFFFF; font-weight: 600; cursor: pointer">
+Export
+<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+</div>
+
+<div style="display: flex; flex-wrap: wrap">
+
+<aside style="flex: 1 1 240px; max-width: 280px; box-sizing: border-box; padding: 20px; background: #F2F2F5; border-right: 1px solid #DCDCE0; display: flex; flex-direction: column; gap: 18px">
+<div style="font-size: 12px; font-weight: 600; color: #5E5E66; letter-spacing: 0.04em; text-transform: uppercase">Speakers</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="s0" style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #5E5E66"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 5px; background: #1F5FAD"></span>S00</label>
+<input id="s0" type="text" value="Dana" style="height: 30px; box-sizing: border-box; padding: 0 10px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF">
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="s1" style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #5E5E66"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 5px; background: #A04F00"></span>S01</label>
+<input id="s1" type="text" placeholder="Name this speaker" style="height: 30px; box-sizing: border-box; padding: 0 10px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF">
+</div>
+<div style="font-size: 12px; color: #5E5E66; line-height: 1.45">Names replace S00, S01… in the saved HTML. The audio links in the file keep working.</div>
+
+<div style="height: 1px; background: #DCDCE0"></div>
+
+<div style="font-size: 12px; font-weight: 600; color: #5E5E66; letter-spacing: 0.04em; text-transform: uppercase">Show</div>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 13px"><input type="checkbox" checked> Timestamps</label>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 13px"><input type="checkbox" checked> Pause marks</label>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 13px"><input type="checkbox"> Uncertain passages</label>
+<div style="font-size: 12px; color: #5E5E66; line-height: 1.45">Uncertain passages are the few lines whisper guessed at random, usually in near-silence.</div>
+</aside>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<div dir="rtl" lang="he" style="flex: 1; padding: 28px 36px; display: flex; flex-direction: column; gap: 18px; font-size: 16px; line-height: 1.7; max-height: 560px; overflow-y: auto">
+
+<p style="margin: 0"><span style="font-weight: 700; color: #1F5FAD">Dana: </span><a href="#" style="color: #5E6B78; text-decoration: none; font-size: 13px" dir="ltr">[00:00:00]</a> בוקר טוב לכולם, בואו נתחיל בסקירה קצרה של השבוע. <span style="color: #6E6E73">(..)</span> יש לנו שלושה נושאים על הסדר.</p>
+
+<p style="margin: 0"><span style="font-weight: 700; color: #A04F00">S01: </span><a href="#" style="color: #5E6B78; text-decoration: none; font-size: 13px" dir="ltr">[00:00:09]</a> מעולה. אני רוצה להוסיף נושא רביעי, אם יש זמן בסוף.</p>
+
+<p style="margin: 0; padding: 8px 12px; margin-inline: -12px; border-radius: 8px; background: #EAF1FC"><span style="font-weight: 700; color: #1F5FAD">Dana: </span><a href="#" style="color: #5E6B78; text-decoration: none; font-size: 13px" dir="ltr">[00:00:15]</a> בטח, נשאיר לזה עשר דקות. <span style="color: #6E6E73">(...)</span> נתחיל מהלוח הזמנים של הגרסה הבאה <span style="color: #A04F00">//S01: כן, בדיוק.//</span> ומה שעוד חסר בה.</p>
+
+<p style="margin: 0"><span style="font-weight: 700; color: #A04F00">S01: </span><a href="#" style="color: #5E6B78; text-decoration: none; font-size: 13px" dir="ltr">[00:00:31]</a> לגבי הלוח, אנחנו בערך באמצע. הבדיקות לוקחות יותר זמן ממה שחשבנו, אז כדאי לעדכן את התאריך כבר עכשיו.</p>
+
+<p style="margin: 0"><span style="font-weight: 700; color: #1F5FAD">Dana: </span><a href="#" style="color: #5E6B78; text-decoration: none; font-size: 13px" dir="ltr">[00:00:48]</a> מסכימה. <span style="color: #6E6E73">(.)</span> בוא נקבע פגישה קצרה מחר בבוקר ונחליט.</p>
+
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 12px 20px; border-top: 1px solid #DCDCE0; background: #F6F6F8">
+<button type="button" aria-label="Pause" style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 18px; background: #0A64D8; color: #FFFFFF; cursor: pointer">
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>
+</button>
+<span style="font-size: 12px; color: #5E5E66; font-variant-numeric: tabular-nums">00:00:17</span>
+<label for="scrub" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Position</label>
+<input id="scrub" type="range" min="0" max="2892" value="17" style="flex: 1 1 240px; accent-color: #0A64D8">
+<span style="font-size: 12px; color: #5E5E66; font-variant-numeric: tabular-nums">00:48:12</span>
+<label for="rate" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Playback speed</label>
+<select id="rate" style="height: 28px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF; padding: 0 6px">
+<option>1×</option>
+<option>1.25×</option>
+<option>1.5×</option>
+<option>2×</option>
+</select>
+<span style="font-size: 12px; color: #5E5E66">Click a timestamp to jump there</span>
+</div>
+</main>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

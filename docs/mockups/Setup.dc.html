@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LiteEcho model setup</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#E8E8ED;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;color:#1D1D1F;-webkit-font-smoothing:antialiased}
+a{color:#0A64D8}a:hover{color:#084FA8}
+button,select,input{font:inherit}
+</style>
+</helmet>
+<div style="padding: 24px; box-sizing: border-box; min-height: 860px">
+<div style="max-width: 1232px; margin: 0 auto; background: #FFFFFF; border: 1px solid #C9C9CF; border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.14)">
+
+<div style="display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 16px; background: #F6F6F8; border-bottom: 1px solid #DCDCE0">
+<div aria-hidden="true" style="display: flex; gap: 8px">
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FF5F57"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FEBC2E"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #28C840"></span>
+</div>
+<div style="font-weight: 600; font-size: 14px">Welcome to LiteEcho</div>
+</div>
+
+<div style="max-width: 760px; margin: 0 auto; padding: 36px 24px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h1 style="margin: 0; font-size: 26px; letter-spacing: -0.01em">Set up the transcription models</h1>
+<p style="margin: 0; font-size: 14px; color: #5E5E66; line-height: 1.55">LiteEcho runs entirely on this Mac. It needs two models, about 1.6 GB in all, downloaded once and checked against pinned checksums.</p>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 12px; background: #EEF5EF; border: 1px solid #BFDCC6">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E7B34" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.6 2.6L16 9.5"></path></svg>
+<div style="flex: 1 1 300px; min-width: 0">
+<div style="font-size: 14px; font-weight: 600">Already have the models?</div>
+<div style="font-size: 13px; color: #3F5B46; margin-top: 2px">Its models are the same ones. Use them and skip the download.</div>
+</div>
+<button type="button" style="height: 32px; padding: 0 14px; border: 0; border-radius: 7px; background: #1E7B34; color: #FFFFFF; font-weight: 600; cursor: pointer">Import from a folder…</button>
+</div>
+
+<div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #5E5E66">
+<div style="flex: 1; height: 1px; background: #DCDCE0"></div>
+or download them
+<div style="flex: 1; height: 1px; background: #DCDCE0"></div>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid #DCDCE0; border-radius: 12px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<div style="flex: 1 1 300px; min-width: 0">
+<h2 style="margin: 0; font-size: 15px">Speech recognition</h2>
+<div style="font-size: 13px; color: #5E5E66; margin-top: 3px">Whisper large-v3-turbo · 1.6 GB · public</div>
+</div>
+<span style="font-size: 13px; color: #0A64D8; font-weight: 600">Downloading · 62%</span>
+</div>
+<div style="height: 6px; border-radius: 3px; background: #E3E3E8; overflow: hidden"><div style="width: 62%; height: 6px; background: #0A64D8"></div></div>
+<div style="font-size: 12px; color: #5E5E66">1.0 GB of 1.6 GB · about 2 min left</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 14px; padding: 18px; border: 1px solid #DCDCE0; border-radius: 12px">
+<div>
+<h2 style="margin: 0; font-size: 15px">Speaker detection</h2>
+<div style="font-size: 13px; color: #5E5E66; margin-top: 3px">pyannote community-1 · 35 MB · free, but needs a Hugging Face account</div>
+</div>
+<ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+<li><a href="https://huggingface.co/pyannote/speaker-diarization-community-1">Open the model page</a>, sign in and accept its terms (CC-BY-4.0).</li>
+<li><a href="https://huggingface.co/settings/tokens">Create a read access token</a> and paste it below.</li>
+</ol>
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px">
+<div style="flex: 1 1 300px; display: flex; flex-direction: column; gap: 6px">
+<label for="tok" style="font-size: 13px; font-weight: 600">Hugging Face access token</label>
+<input id="tok" type="password" autocomplete="off" placeholder="hf_…" style="height: 32px; box-sizing: border-box; padding: 0 10px; border: 1px solid #C9C9CF; border-radius: 7px; background: #FFFFFF">
+</div>
+<button type="button" style="height: 32px; padding: 0 14px; border: 0; border-radius: 7px; background: #0A64D8; color: #FFFFFF; font-weight: 600; cursor: pointer">Verify and download</button>
+</div>
+<div style="font-size: 12px; color: #5E5E66">Kept in your macOS Keychain and only sent to huggingface.co to download this model.</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 4px">
+<div style="flex: 1 1 300px; font-size: 12px; color: #5E5E66">Models are stored in ~/Library/Application Support/LiteEcho. You can change this in Settings.</div>
+<button type="button" disabled style="height: 32px; padding: 0 18px; border: 0; border-radius: 7px; background: #D6D6DB; color: #5E5E66; font-weight: 600">Continue</button>
+</div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

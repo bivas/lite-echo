@@ -1,0 +1,24 @@
+# Build outputs
+build/
+dist/
+app/.build/
+app/.build-*/
+app/.swiftpm/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Transcripts and audio never belong in the repo
+*.m4a
+*.mp3
+*.wav
+/*.html
+
+# Local regression references (made from private recordings)
+tests/.expected/

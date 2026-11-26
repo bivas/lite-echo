@@ -1,0 +1,91 @@
+import LiteEchoCore
+import LiteEchoQueue
+import LiteEchoSetup
+import LiteEchoShared
+import SwiftUI
+
+/// App shell (owned by the orchestrator). Feature folders own their views:
+/// LiteEchoQueue → QueueRootView, LiteEchoSetup → SetupView + SettingsView.
+/// Each is a public View. Transcripts open in the default browser, not in a window of this app.
+@main
+struct LiteEchoApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @StateVar private var model: AppModel
+    @StateVar private var queue: QueueStore
+
+    init() {
+        // Move data from the former "localScribe" install before anything reads it.
+        let migration = LaunchMigration.run()
+        let model = AppModel()
+        model.reinstallEngineWithoutAsking = migration.engineNeedsReinstall
+        let queue = QueueStore(model: model)
+        _model = StateVar(initialValue: model)
+        _queue = StateVar(initialValue: queue)
+        AppDelegate.queue = queue
+    }
+
+    var body: some Scene {
+        Window("LiteEcho", id: WindowID.main) {
+            RootView(queue: queue)
+                .environment(model)
+                .environment(model.settings)
+                .frame(minWidth: 820, minHeight: 560)
+                .themed(model.settings)
+        }
+        .defaultSize(width: 1180, height: 760)
+
+        Settings {
+            SettingsView()
+                .environment(model)
+                .environment(model.settings)
+                .themed(model.settings)
+        }
+
+        // Status item: progress of the running job, recently finished files, quick actions.
+        MenuBarExtra(isInserted: Bindable(model.settings).showMenuBarItem) {
+            MenuBarContent(store: queue)
+                .environment(model)
+                .environment(model.settings)
+                .themed(model.settings)
+        } label: {
+            MenuBarLabel(store: queue)
+        }
+        .menuBarExtraStyle(.window)
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Set once at launch; receives files opened from Finder ("Open With", Dock drops).
+    @MainActor static weak var queue: QueueStore?
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        let files = urls.filter(\.isFileURL)
+        Task { @MainActor in AppDelegate.queue?.add(files) }
+    }
+}
+
+/// Shows first-run setup until the engine and both models are ready, then the queue.
+struct RootView: View {
+    let queue: QueueStore
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Group {
+            if model.needsSetup {
+                SetupView()
+            } else {
+                // The queue only starts once the engine matches this app's bundled engine files.
+                EngineUpdateGate {
+                    QueueRootView(store: queue)
+                        .task {
+                            // Resume jobs restored from the last session once the engine is ready.
+                            queue.start()
+                        }
+                }
+            }
+        }
+        .task { await model.refreshEngineInfo() }
+    }
+}
